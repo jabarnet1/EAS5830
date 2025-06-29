@@ -43,7 +43,7 @@ def connect_with_middleware(contract_json):
 
 	# contract = 0
 
-	w3.middleware_onion.add(ExtraDataToPOAMiddleware, layer=0)
+	w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 	contract = w3.eth.contract(address=address, abi=abi)
 
 	return w3, contract
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
 	connect_to_eth()
 
-	'''
+'''
 	w3_ether = connect_to_eth()
 
 	print(f"connect_to_eth: {w3_ether.is_connected()}")
@@ -67,4 +67,5 @@ if __name__ == "__main__":
 		print(f"Current value from contract: {contract.all_events()}")
 	except Exception as e:
 		print(f"Error calling getValue: {e}")
-	'''
+
+'''
