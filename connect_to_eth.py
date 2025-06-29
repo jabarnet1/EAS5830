@@ -43,7 +43,7 @@ def connect_with_middleware(contract_json):
 
 	# contract = 0
 
-	w3.middleware_onion.add(ExtraDataToPOAMiddleware)
+	w3.middleware_onion.add(ExtraDataToPOAMiddleware, layer=0)
 	contract = w3.eth.contract(address=address, abi=abi)
 
 	return w3, contract
