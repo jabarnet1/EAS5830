@@ -1,0 +1,15 @@
+{
+    "name": "LiBre NFT1",
+    "description": "This is very first NFT for LiBre.",
+    "image": "ipfs://QmQ1ezLU4sF91uDRG1nHPNzwNR2D88ezoZH3MBTZXrgzDb",
+    "attributes": [
+        {
+            "trait_type": "Background",
+            "value": "Yellow"
+        },
+        {
+            "trait_type": "Logo",
+            "value": "Square"
+        }
+    ]
+}
