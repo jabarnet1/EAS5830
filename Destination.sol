@@ -59,8 +59,6 @@ contract Destination is AccessControl {
         emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient_on_source_chain, _amount);
     }
 }
-Use code with caution.
-	}
 
 	function createToken(address _underlying_token, string memory name, string memory symbol ) public onlyRole(CREATOR_ROLE) returns(address) {
 		//YOUR CODE HERE
