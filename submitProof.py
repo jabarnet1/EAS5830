@@ -147,21 +147,15 @@ def prove_merkle(merkle_tree, random_indx):
     # TODO YOUR CODE HERE
 
     leaves = merkle_tree[0]
-
     original_leaves_count = len(merkle_tree[0])
-
     target_leaf_value = leaves[random_indx]
-
     current_index = leaves.index(target_leaf_value)
-
     current_level_index = current_index
 
     for level in range(len(merkle_tree) - 1):
-
         current_level_hashes = merkle_tree[level]
         is_left_child = (current_level_index % 2 == 0)
         sibling_index = current_level_index + 1 if is_left_child else current_level_index - 1
-
         if sibling_index < len(current_level_hashes):
             merkle_proof.append(current_level_hashes[sibling_index])
         current_level_index //= 2
@@ -183,12 +177,7 @@ def sign_challenge(challenge):
     eth_sk = acct.key
 
     # TODO YOUR CODE HERE
-
-    # encode_defunct prepares the message with the Ethereum message prefix
-    # "\x19Ethereum Signed Message:\n" + len(message) + message
     signable_message = eth_account.messages.encode_defunct(text=challenge)
-
-    # Sign the message using the private key associated with the account
     eth_sig_obj = acct.sign_message(signable_message)
 
     return addr, eth_sig_obj.signature.hex()
@@ -208,53 +197,33 @@ def send_signed_msg(proof, random_leaf):
 
     # TODO YOUR CODE HERE
 
-    tx_hash = '0x'  # Initialize tx_hash
+    tx_hash = '0x'
 
     if not w3 or not w3.is_connected():
         print(f"Error: Not connected to {chain} node.")
         return tx_hash
 
-    # Ensure the contract instance is created
     contract = w3.eth.contract(address=address, abi=abi)
 
     # --- TODO YOUR CODE HERE ---
     try:
-        # Get the latest nonce for the account to prevent transaction replay attacks
         nonce = w3.eth.get_transaction_count(acct.address)
-
-        # Estimate the gas required for the transaction.
-        # This is a crucial step to avoid transaction failures due to insufficient gas.
-        # Assuming the contract function to claim the prime is called `claimPrime`.
-        # The arguments for `claimPrime` are `proof` (list of bytes32) and `random_leaf` (bytes32).
-        # BSC does not use EIP-1559 transactions ({Link: type 2 https://web3py.readthedocs.io/en/v5/web3.eth.html}) and requires `gasPrice` instead of `maxFeePerGas` and `maxPriorityFeePerGas`.
         gas_estimate = contract.functions.submit(proof, random_leaf).estimate_gas({'from': acct.address})
-
-        # Add a buffer to the gas estimate to account for potential fluctuations or slight underestimations
-        # A common practice is to multiply by a factor like 1.1 or 1.2
         gas_limit = int(gas_estimate * 1.2)
-
-        # Get the current gas price from the network
         gas_price = w3.eth.gas_price
 
-        # Build the transaction dictionary
         transaction = contract.functions.submit(proof, random_leaf).build_transaction({
             'from': acct.address,
             'nonce': nonce,
             'gas': gas_limit,
-            'gasPrice': gas_price,  # Use gasPrice for BSC.
-            'chainId': w3.eth.chain_id  # Explicitly specify chainId
+            'gasPrice': gas_price,
+            'chainId': w3.eth.chain_id
         })
 
-        # Sign the transaction with the private key
         signed_tx = acct.sign_transaction(transaction)
-
-        # Send the signed raw transaction to the network
         tx_hash_bytes = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-
-        # Convert the transaction hash from bytes to a hex string
         tx_hash = tx_hash_bytes.hex()
 
-        # Optionally, wait for the transaction to be mined and get the receipt
         print(f"Transaction sent! Waiting for receipt for tx hash: {tx_hash}")
         tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash_bytes)
         print(f"Transaction receipt: {tx_receipt}")
