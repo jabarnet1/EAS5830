@@ -56,7 +56,7 @@ contract Destination is AccessControl {
         // 4. Burn the wrapped tokens from the caller (msg.sender).
         wrappedTokenInstance.burn(msg.sender, _amount);
 
-        emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient_on_source_chain, _amount);
+        emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
     }
 
 
