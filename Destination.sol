@@ -54,7 +54,7 @@ contract Destination is AccessControl {
         BridgeToken wrappedTokenInstance = BridgeToken(_wrapped_token);
 
         // 4. Burn the wrapped tokens from the caller (msg.sender).
-        wrappedTokenInstance.burn(msg.sender, _amount);
+        wrappedTokenInstance.burn(_amount);
 
         emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
     }
@@ -67,7 +67,8 @@ contract Destination is AccessControl {
         require(underlying_tokens[_underlying_token] == address(0), "Token already bridged");
 
         // Deploy a new BridgeToken contract
-        BridgeToken newToken = new BridgeToken(name, symbol);
+        // BridgeToken constructor expects: address _underlying, string memory name, string memory symbol, address admin
+        BridgeToken newToken = new BridgeToken(_underlying_token, name, symbol, address(this)); // Corrected constructor call based on BridgeToken.sol
 
         // Store the mapping between the underlying and wrapped tokens
         underlying_tokens[_underlying_token] = address(newToken);
