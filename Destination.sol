@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./BridgeToken.sol";
 
+import {console} from "forge-std/console.sol";
+
 contract Destination is AccessControl {
     bytes32 public constant WARDEN_ROLE = keccak256("BRIDGE_WARDEN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
@@ -25,64 +27,106 @@ contract Destination is AccessControl {
 	function wrap(address _underlying_token, address _recipient, uint256 _amount ) public onlyRole(WARDEN_ROLE) {
 		//YOUR CODE HERE
 
-		// 1. Check if the underlying token has been registered (created via createToken)
+		console.log("--- wrap START ---");
+        console.log("Called by (msg.sender):", msg.sender);
+        console.log("Underlying token param (_underlying_token):", _underlying_token);
+        console.log("Recipient param (_recipient):", _recipient);
+        console.log("Amount param (_amount):", _amount);
+
+        // 1. Check if the underlying token has been registered (created via createToken)
         address wrappedTokenAddress = underlying_tokens[_underlying_token];
+        console.log("Lookup result for underlying_tokens[_underlying_token]:", wrappedTokenAddress); // Debug 1.1: Check mapping lookup result
         require(wrappedTokenAddress != address(0), "Underlying token not registered");
+        console.log("Require check passed: Underlying token is registered.");
 
         // 2. Lookup the BridgeToken instance
         BridgeToken wrappedTokenInstance = BridgeToken(wrappedTokenAddress);
+        console.log("Wrapped token instance address:", address(wrappedTokenInstance)); // Debug 1.2: Confirm instance address
 
         // 3. Mint the corresponding amount of BridgeTokens to the recipient
-        // The _mint function is part of the ERC20 standard and is available in BridgeToken
+        console.log("Recipient's balance BEFORE mint:", wrappedTokenInstance.balanceOf(_recipient)); // Debug 1.3: Check recipient balance before mint
         wrappedTokenInstance.mint(_recipient, _amount);
+        console.log("Mint call executed.");
+        console.log("Recipient's balance AFTER mint:", wrappedTokenInstance.balanceOf(_recipient)); // Debug 1.4: Check recipient balance after mint
 
         // 4. Emit the Wrap event
         emit Wrap(_underlying_token, wrappedTokenAddress, _recipient, _amount);
+        console.log("Wrap event emitted.");
+        console.log("--- wrap END ---");
 
 	}
 
 	function unwrap(address _wrapped_token, address _recipient, uint256 _amount ) public {
 		//YOUR CODE HERE
 
-		 // 1. Verify that the _wrapped_token is indeed a BridgeToken managed by this contract.
+        console.log("--- unwrap START ---"); // Debug Step 5: Start marker
+        console.log("Called by (msg.sender):", msg.sender);
+        console.log("Wrapped token param (_wrapped_token):", _wrapped_token);
+        console.log("Recipient param (_recipient):", _recipient);
+        console.log("Amount param (_amount):", _amount);
+
+        // 1. Verify that the _wrapped_token is indeed a BridgeToken managed by this contract.
         require(wrapped_tokens[_wrapped_token] != address(0), "Invalid wrapped token address");
+        console.log("Require check passed: Wrapped token is registered.");
 
         // 2. Get the address of the underlying token (on the source chain).
         address underlyingTokenAddress = wrapped_tokens[_wrapped_token];
+        console.log("Resolved underlying token address:", underlyingTokenAddress);
 
         // 3. Cast the _wrapped_token address to a BridgeToken contract instance.
         BridgeToken wrappedTokenInstance = BridgeToken(_wrapped_token);
+        console.log("Wrapped token instance address:", address(wrappedTokenInstance));
 
         // 4. Burn the wrapped tokens from the caller (msg.sender).
-        wrappedTokenInstance.burn(_amount);
+        uint256 senderBalance = wrappedTokenInstance.balanceOf(msg.sender); // Debug Step 6: Get balance before burn
+        console.log("Sender's balance before burn:", senderBalance);
+        console.log("Amount to burn:", _amount);
+        
+        // Explicitly add a check here, although _burn also checks, this log helps pinpoint.
+        require(senderBalance >= _amount, "Unwrap: Insufficient balance for burn (Debug)");
+
+        wrappedTokenInstance.burn(_amount); // The problematic call
+        console.log("Burn call executed successfully."); // This line won't be logged if it reverts
+        console.log("Sender's balance AFTER burn:", wrappedTokenInstance.balanceOf(msg.sender)); // Debug Step 7: Check balance after burn
 
         emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
+        console.log("Unwrap event emitted.");
+        console.log("--- unwrap END ---"); // Debug Step 8: End marker
+
     }
 
 
 	function createToken(address _underlying_token, string memory name, string memory symbol ) public onlyRole(CREATOR_ROLE) returns(address) {
 		//YOUR CODE HERE
 
-		// Ensure this underlying token hasn't been bridged before
+		console.log("--- createToken START ---"); // Debug Step 1: Start marker
+        console.log("Called by (msg.sender):", msg.sender);
+        console.log("Underlying token param (_underlying_token):", _underlying_token);
+        console.log("Token name:", name);
+        console.log("Token symbol:", symbol);
+
+        // Ensure this underlying token hasn't been bridged before
         require(underlying_tokens[_underlying_token] == address(0), "Token already bridged");
+        console.log("Require check passed: Token not already bridged.");
 
         // Deploy a new BridgeToken contract
-        // BridgeToken constructor expects: address _underlying, string memory name, string memory symbol, address admin
-        BridgeToken newToken = new BridgeToken(_underlying_token, name, symbol, address(this)); // Corrected constructor call based on BridgeToken.sol
+        BridgeToken newToken = new BridgeToken(_underlying_token, name, symbol, address(this)); 
+        console.log("New BridgeToken deployed at address:", address(newToken));
+        console.log("Admin for new BridgeToken (address(this)):", address(this));
 
         // Store the mapping between the underlying and wrapped tokens
         underlying_tokens[_underlying_token] = address(newToken);
         wrapped_tokens[address(newToken)] = _underlying_token;
+        tokens.push(address(newToken)); // Note: Check if 'tokens' array grows too large in real usage, not a debug issue here.
 
-        // Add the new token to the list of deployed tokens
-        tokens.push(address(newToken));
+        console.log("Mapped underlying_tokens[_underlying_token]:", underlying_tokens[_underlying_token]); // Debug Step 2: Check mapping after assignment
+        console.log("Mapped wrapped_tokens[address(newToken)]:", wrapped_tokens[address(newToken)]);   // Debug Step 3: Check mapping after assignment
 
-        // Emit the Creation event
         emit Creation(_underlying_token, address(newToken));
+        console.log("Creation event emitted.");
+        console.log("--- createToken END ---"); // Debug Step 4: End marker
 
-        // Return the address of the newly created BridgeToken
         return address(newToken);
-
 	}
 
 }
