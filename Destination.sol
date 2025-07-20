@@ -59,39 +59,41 @@ contract Destination is AccessControl {
 	function unwrap(address _wrapped_token, address _recipient, uint256 _amount ) public {
 		//YOUR CODE HERE
 
-        console.log("--- unwrap START ---"); // Debug Step 5: Start marker
+
+        console.log("--- unwrap START ---");
         console.log("Called by (msg.sender):", msg.sender);
         console.log("Wrapped token param (_wrapped_token):", _wrapped_token);
         console.log("Recipient param (_recipient):", _recipient);
         console.log("Amount param (_amount):", _amount);
 
-        // 1. Verify that the _wrapped_token is indeed a BridgeToken managed by this contract.
         require(wrapped_tokens[_wrapped_token] != address(0), "Invalid wrapped token address");
         console.log("Require check passed: Wrapped token is registered.");
 
-        // 2. Get the address of the underlying token (on the source chain).
         address underlyingTokenAddress = wrapped_tokens[_wrapped_token];
         console.log("Resolved underlying token address:", underlyingTokenAddress);
 
-        // 3. Cast the _wrapped_token address to a BridgeToken contract instance.
         BridgeToken wrappedTokenInstance = BridgeToken(_wrapped_token);
         console.log("Wrapped token instance address:", address(wrappedTokenInstance));
 
-        // 4. Burn the wrapped tokens from the caller (msg.sender).
-        uint256 senderBalance = wrappedTokenInstance.balanceOf(msg.sender); // Debug Step 6: Get balance before burn
-        console.log("Sender's balance before burn:", senderBalance);
+        uint256 senderBalance = wrappedTokenInstance.balanceOf(msg.sender);
+        console.log("User's balance before burn:", senderBalance); // Renamed for clarity
         console.log("Amount to burn:", _amount);
-        
-        // Explicitly add a check here, although _burn also checks, this log helps pinpoint.
-        require(senderBalance >= _amount, "Unwrap: Insufficient balance for burn (Debug)");
 
-        wrappedTokenInstance.burn(_amount); // The problematic call
-        console.log("Burn call executed successfully."); // This line won't be logged if it reverts
-        console.log("Sender's balance AFTER burn:", wrappedTokenInstance.balanceOf(msg.sender)); // Debug Step 7: Check balance after burn
+        // The user (msg.sender) must first have approved
+        // the Destination contract to spend their wrapped tokens using
+        // BridgeToken.approve(address(destination), _amount)
+
+        // --- THIS IS THE CRUCIAL CHANGE ---
+        console.log("Calling BridgeToken.burnFrom(msg.sender, _amount)...");
+        wrappedTokenInstance.burnFrom(msg.sender, _amount); // Burn tokens from the user (msg.sender)
+        console.log("BridgeToken.burnFrom executed successfully.");
+        // --- END OF CHANGE ---
+
+        console.log("User's balance AFTER burn:", wrappedTokenInstance.balanceOf(msg.sender));
 
         emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
         console.log("Unwrap event emitted.");
-        console.log("--- unwrap END ---"); // Debug Step 8: End marker
+        console.log("--- unwrap END ---");
 
     }
 
