@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./BridgeToken.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract Destination is AccessControl {
     bytes32 public constant WARDEN_ROLE = keccak256("BRIDGE_WARDEN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
@@ -30,61 +28,53 @@ contract Destination is AccessControl {
 		require(_underlying_token != address(0), "Invalid underlying token address");
         require(underlying_tokens[_underlying_token] == address(0), "Wrapped token already exists for this underlying token");
 
-        // Deploy a new BridgeToken contract.
-        // The admin for the BridgeToken's AccessControl will be this Destination contract.
+        // a new BridgeToken contract.
         BridgeToken newWrappedToken = new BridgeToken(_underlying_token, name, symbol, address(this));
 
-        // Store the mapping
-        //underlying_tokens[_underlying_token] = address(newWrappedToken);
-        //wrapped_tokens[address(newWrappedToken)] = _underlying_token;
-
+        // mapping
         wrapped_tokens[_underlying_token] = address(newWrappedToken);
         underlying_tokens[address(newWrappedToken)] = _underlying_token;
-        tokens.push(address(newWrappedToken)); // Add to the list of deployed tokens
+        tokens.push(address(newWrappedToken));
 
-
-
-        // Grant this Destination contract the MINTER_ROLE on the newly deployed BridgeToken
+        // MINTER_ROLE
         BridgeToken(address(newWrappedToken)).grantRole(newWrappedToken.MINTER_ROLE(), address(this));
 
+        // emit
         emit Creation(_underlying_token, address(newWrappedToken));
-        //emit Creation(_underlying_token, address(0));
 
         return address(newWrappedToken);
-
 	}
 
 	function wrap(address _underlying_token, address _recipient, uint256 _amount ) public onlyRole(WARDEN_ROLE) {
 		//YOUR CODE HERE
 
-        // Add console logs for debugging the "Wrapped token not registered" revert
-        console.log("--- Destination::wrap START ---");
-        console.log("  Caller (msg.sender):", msg.sender);
-        console.log("  _underlying_token (input to wrap):", _underlying_token);
+        // mapping
         address wrappedTokenAddress = wrapped_tokens[_underlying_token];
-        console.log("  Lookup result (wrappedTokenAddress):", wrappedTokenAddress);
+
+        // registration check
         require(wrappedTokenAddress != address(0), "Wrapped token not registered for this underlying token");
 
+        // mint
         BridgeToken(wrappedTokenAddress).mint(_recipient, _amount);
 
+        // emit
         emit Wrap(_underlying_token, wrappedTokenAddress, _recipient, _amount);
-        console.log("--- Destination::wrap END ---");
-
 	}
 
 	function unwrap(address _wrapped_token, address _recipient, uint256 _amount ) public {
 		//YOUR CODE HERE
 
+        // mapping
         address underlyingTokenAddress = underlying_tokens[_wrapped_token];
+
+        // registration check
         require(underlyingTokenAddress != address(0), "Not a registered wrapped token");
 
-        // CHANGE: Use burnFrom instead of burn
-        // The `msg.sender` for this call is the `Destination` contract itself.
-        // It holds the MINTER_ROLE on the BridgeToken, so burnFrom will succeed without prior allowance.
+        // burn
         BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
+        // emit
         emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
-        
     }
 }
 
