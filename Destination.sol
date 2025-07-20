@@ -35,15 +35,20 @@ contract Destination is AccessControl {
         BridgeToken newWrappedToken = new BridgeToken(_underlying_token, name, symbol, address(this));
 
         // Store the mapping
-        underlying_tokens[_underlying_token] = address(newWrappedToken);
-        wrapped_tokens[address(newWrappedToken)] = _underlying_token;
+        //underlying_tokens[_underlying_token] = address(newWrappedToken);
+        //wrapped_tokens[address(newWrappedToken)] = _underlying_token;
+
+        wrapped_tokens[_underlying_token] = address(newWrappedToken);
+        underlying_tokens[address(newWrappedToken)] = _underlying_token;
         tokens.push(address(newWrappedToken)); // Add to the list of deployed tokens
+
+
 
         // Grant this Destination contract the MINTER_ROLE on the newly deployed BridgeToken
         BridgeToken(address(newWrappedToken)).grantRole(newWrappedToken.MINTER_ROLE(), address(this));
 
-        //emit Creation(_underlying_token, address(newWrappedToken));
-        emit Creation(_underlying_token, address(0));
+        emit Creation(_underlying_token, address(newWrappedToken));
+        //emit Creation(_underlying_token, address(0));
 
         return address(newWrappedToken);
 
