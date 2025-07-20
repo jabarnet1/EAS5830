@@ -37,7 +37,7 @@ contract Destination is AccessControl {
         console.log("Amount param (_amount):", _amount);
 
         // 1. Check if the underlying token has been registered (created via createToken)
-        address wrappedTokenAddress = wrapped_tokens[_underlying_token];
+        address wrappedTokenAddress = underlying_tokens[_underlying_token];
 
         console.log("Lookup result for underlying_tokens[_underlying_token]:", wrappedTokenAddress); // Debug 1.1: Check mapping lookup result
         require(wrappedTokenAddress != address(0), "Underlying token not registered");
@@ -72,10 +72,10 @@ contract Destination is AccessControl {
         console.log("Recipient param (_recipient):", _recipient);
         console.log("Amount param (_amount):", _amount);
 
-        require(underlying_tokens[_wrapped_token] != address(0), "Invalid wrapped token address");
+        require(wrapped_tokens[_wrapped_token] != address(0), "Invalid wrapped token address");
         console.log("Require check passed: Wrapped token is registered.");
 
-        address underlyingTokenAddress = underlying_tokens[_wrapped_token];
+        address underlyingTokenAddress = wrapped_tokens[_wrapped_token];
         console.log("Resolved underlying token address:", underlyingTokenAddress);
 
         BridgeToken wrappedTokenInstance = BridgeToken(_wrapped_token);
