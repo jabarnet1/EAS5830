@@ -27,6 +27,10 @@ contract Destination is AccessControl {
 	function wrap(address _underlying_token, address _recipient, uint256 _amount ) public onlyRole(WARDEN_ROLE) {
 		//YOUR CODE HERE
 
+        require(_amount > 0, "Amount must be positive"); // Add this check
+        require(_recipient != address(0), "Invalid recipient"); // Add this check
+
+
 		console.log("--- wrap START ---");
         console.log("Called by (msg.sender):", msg.sender);
         console.log("Underlying token param (_underlying_token):", _underlying_token);
@@ -59,7 +63,9 @@ contract Destination is AccessControl {
 	function unwrap(address _wrapped_token, address _recipient, uint256 _amount ) public {
 		//YOUR CODE HERE
 
-
+        require(_amount > 0, "Amount must be positive"); // Add this check
+        require(_recipient != address(0), "Invalid recipient"); // Add this check
+        
         console.log("--- unwrap START ---");
         console.log("Called by (msg.sender):", msg.sender);
         console.log("Wrapped token param (_wrapped_token):", _wrapped_token);
