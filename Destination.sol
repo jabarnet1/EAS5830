@@ -42,7 +42,8 @@ contract Destination is AccessControl {
         // Grant this Destination contract the MINTER_ROLE on the newly deployed BridgeToken
         BridgeToken(address(newWrappedToken)).grantRole(newWrappedToken.MINTER_ROLE(), address(this));
 
-        emit Creation(_underlying_token, address(newWrappedToken));
+        //emit Creation(_underlying_token, address(newWrappedToken));
+        emit Creation(_underlying_token, address(0));
 
         return address(newWrappedToken);
 
