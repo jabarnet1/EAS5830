@@ -47,8 +47,8 @@ contract Destination is AccessControl {
         // Grant this Destination contract the MINTER_ROLE on the newly deployed BridgeToken
         BridgeToken(address(newWrappedToken)).grantRole(newWrappedToken.MINTER_ROLE(), address(this));
 
-        //emit Creation(_underlying_token, address(newWrappedToken));
-        emit Creation(_underlying_token, address(0));
+        emit Creation(_underlying_token, address(newWrappedToken));
+        //emit Creation(_underlying_token, address(0));
 
         return address(newWrappedToken);
 
@@ -57,32 +57,34 @@ contract Destination is AccessControl {
 	function wrap(address _underlying_token, address _recipient, uint256 _amount ) public onlyRole(WARDEN_ROLE) {
 		//YOUR CODE HERE
 
-        address wrappedTokenAddress = underlying_tokens[_underlying_token];
+        // Add console logs for debugging the "Wrapped token not registered" revert
+        console.log("--- Destination::wrap START ---");
+        console.log("  Caller (msg.sender):", msg.sender);
+        console.log("  _underlying_token (input to wrap):", _underlying_token);
+        address wrappedTokenAddress = wrapped_tokens[_underlying_token];
+        console.log("  Lookup result (wrappedTokenAddress):", wrappedTokenAddress);
         require(wrappedTokenAddress != address(0), "Wrapped token not registered for this underlying token");
 
-        // Use the mint function available in BridgeToken.sol
         BridgeToken(wrappedTokenAddress).mint(_recipient, _amount);
 
         emit Wrap(_underlying_token, wrappedTokenAddress, _recipient, _amount);
+        console.log("--- Destination::wrap END ---");
 
 	}
 
 	function unwrap(address _wrapped_token, address _recipient, uint256 _amount ) public {
 		//YOUR CODE HERE
 
-        address underlyingTokenAddress = wrapped_tokens[_wrapped_token];
+        address underlyingTokenAddress = underlying_tokens[_wrapped_token];
         require(underlyingTokenAddress != address(0), "Not a registered wrapped token");
 
-        // Use the burn function available in BridgeToken.sol (ERC20Burnable extension)
-        // This burn function will internally call _burn(msg.sender, amount)
-        BridgeToken(_wrapped_token).burn(_amount);
+        // CHANGE: Use burnFrom instead of burn
+        // The `msg.sender` for this call is the `Destination` contract itself.
+        // It holds the MINTER_ROLE on the BridgeToken, so burnFrom will succeed without prior allowance.
+        BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
         emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
-
-        // After burning, a separate mechanism (off-chain relayer) would
-        // observe this event and trigger the release of original tokens on the source chain.
-
-
+        
     }
 }
 
