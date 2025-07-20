@@ -32,7 +32,7 @@ contract Destination is AccessControl {
 
         // Deploy a new BridgeToken contract.
         // The admin for the BridgeToken's AccessControl will be this Destination contract.
-        BridgeToken newWrappedToken = new BridgeToken(_underlying_token, _name, _symbol, address(this));
+        BridgeToken newWrappedToken = new BridgeToken(_underlying_token, name, symbol, address(this));
 
         // Store the mapping
         underlying_tokens[_underlying_token] = address(newWrappedToken);
