@@ -84,11 +84,12 @@ contract AMM is AccessControl{
         // The check for positive reserves is still crucial to prevent division by zero.
         require(currentReserveIn > 0 && currentReserveOut > 0, "Insufficient liquidity for calculation");
 
-        uint256 amountInWithFee = sellAmount.mul(uint256(10000).sub(feebps)); // Apply the fee
-        uint256 numerator = amountInWithFee.mul(currentReserveOut);
-        uint256 denominator = currentReserveIn.mul(10000).add(amountInWithFee);
-        swapAmt = numerator.div(denominator);
-		
+        uint256 amountInWithFee = sellAmount * (10000 - feebps); // Apply the fee
+        uint256 numerator = amountInWithFee * currentReserveOut;
+        uint256 denominator = currentReserveIn * 10000 + amountInWithFee;
+        swapAmt = numerator / denominator;
+
+
         IERC20(buyToken).transfer(msg.sender, swapAmt);
 
         emit Swap(sellToken, buyToken, sellAmount, swapAmt);
