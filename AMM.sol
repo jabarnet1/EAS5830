@@ -58,60 +58,53 @@ contract AMM is AccessControl{
 
 		//YOUR CODE HERE 
 
-		// Determine which token is being sold and which is being bought
-    bool sellingTokenA = (sellToken == tokenA);
-    address buyTokenAddress = sellingTokenA ? tokenB : tokenA;
-    IERC20 buyToken = IERC20(buyTokenAddress);
-    IERC20 sellTokenContract = IERC20(sellToken);
+		address buyToken;
+        uint256 reserveIn;
+        uint256 reserveOut;
 
-		// Transfer the sellAmount from the user to the contract
-		sellTokenContract.safeTransferFrom(msg.sender, address(this), sellAmount);
+        // Determine input and output tokens and their reserves
+        if (sellToken == tokenA) {
+            qtyA = sellAmount; // User is selling tokenA
+            buyToken = tokenB;
+            reserveIn = reserveA;
+            reserveOut = reserveB;
+        } else { // sellToken == tokenB
+            qtyB = sellAmount; // User is selling tokenB
+            buyToken = tokenA;
+            reserveIn = reserveB;
+            reserveOut = reserveA;
+        }
 
-		// Calculate the effective amount after applying the trading fee
-		// The fee is taken from the deposited side (sellAmount)
-		uint256 effectiveSellAmount = (sellAmount * (10000 - feebps)) / 10000;
+        // Pull the sellToken from the user
+        // Requires msg.sender to have pre-approved this contract for `sellAmount`
+        IERC20(sellToken).transferFrom(msg.sender, address(this), sellAmount);
 
-		uint256 currentReserveA = reserveA;
-		uint256 currentReserveB = reserveB;
+        // Calculate the amount of buyToken (swapAmt) to send to the user
+        // Using SafeMath for overflow/underflow protection.
+        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity for calculation");
 
-		uint256 buyAmount;
+        uint256 amountInWithFee = sellAmount.mul(10000..sub(feebps)); // Apply the fee
+        uint256 numerator = amountInWithFee.mul(reserveOut);
+        uint256 denominator = reserveIn.mul(10000).add(amountInWithFee);
+        swapAmt = numerator.div(denominator); // Assign the calculated amount to swapAmt
 
-		// Calculate buyAmount using the constant product formula with the effective sell amount
-		if (sellingTokenA) {
-				uint256 newReserveA = currentReserveA + effectiveSellAmount;
-				// Solve for buyAmount: (currentReserveA + effectiveSellAmount) * (currentReserveB - buyAmount) = invariant
-				// buyAmount = currentReserveB - (invariant / newReserveA)
-				buyAmount = currentReserveB - (invariant / newReserveA);
-				require(buyAmount < currentReserveB, "Not enough liquidity for trade");
-				require(invariant / newReserveA < currentReserveB, "Insufficient liquidity for trade"); // Handle potential integer division edge case
-		} else { // selling Token B
-				uint256 newReserveB = currentReserveB + effectiveSellAmount;
-				// Solve for buyAmount: (currentReserveB + effectiveSellAmount) * (currentReserveA - buyAmount) = invariant
-				// buyAmount = currentReserveA - (invariant / newReserveB)
-				buyAmount = currentReserveA - (invariant / newReserveB);
-				require(buyAmount < currentReserveA, "Not enough liquidity for trade");
-				require(invariant / newReserveB < currentReserveA, "Insufficient liquidity for trade"); // Handle potential integer division edge case
-		}
+        // Slippage protection.
+        require(swapAmt >= minBuyAmount, "Slippage exceeds minimum accepted");
 
-		require(buyAmount > 0, "Trade resulted in zero output");
+        // Update reserves
+        // Using SafeMath for overflow/underflow protection.
+        if (sellToken == tokenA) {
+            reserveA = reserveA.add(qtyA); // Update reserveA with qtyA (which is sellAmount)
+            reserveB = reserveB.sub(swapAmt); // Subtract swapAmt from reserveB
+        } else { // sellToken == tokenB
+            reserveB = reserveB.add(qtyB); // Update reserveB with qtyB (which is sellAmount)
+            reserveA = reserveA.sub(swapAmt); // Subtract swapAmt from reserveA
+        }
 
-		// Update the contract's reserves
-		if (sellingTokenA) {
-				reserveA = currentReserveA + sellAmount; // Full sellAmount is added to reserves (including fee portion)
-				reserveB = currentReserveB - buyAmount;
-		} else {
-				reserveB = currentReserveB + sellAmount; // Full sellAmount is added to reserves (including fee portion)
-				reserveA = currentReserveA - buyAmount;
-		}
+        // Send the buyToken to the user
+        IERC20(buyToken).transfer(msg.sender, swapAmt); // Send swapAmt to the user
 
-		// The invariant increases because the fee portion is added to the reserves but not used in the swap calculation
-		invariant = reserveA * reserveB;
-
-		// Transfer the calculated buyAmount of the other token to the sender
-		buyToken.safeTransfer(msg.sender, buyAmount);
-
-		emit Swap(sellToken, buyTokenAddress, sellAmount, buyAmount);
-
+        emit Swap(sellToken, buyToken, sellAmount, swapAmt);
 
 
 		//END
@@ -128,41 +121,72 @@ contract AMM is AccessControl{
 		require( amtA > 0 || amtB > 0, 'Cannot provide 0 liquidity' );
 		//YOUR CODE HERE
 
-		// Transfer tokens from the liquidity provider to the contract
-		// The sender (msg.sender) must have approved the AMM contract to spend these tokens previously.
-		IERC20(tokenA).safeTransferFrom(msg.sender, address(this), tokenA_quantity);
-		IERC20(tokenB).safeTransferFrom(msg.sender, address(this), tokenB_quantity);
+		        // You could allow one if the pool already has liquidity to rebalance,
+        // but for a simple AMM, requiring both is safer.
 
-		uint256 newLiquidityShares;
+        // 1. Pull tokens from the sender
+        IERC20(tokenA).transferFrom(msg.sender, address(this), amtA);
+        IERC20(tokenB).transferFrom(msg.sender, address(this), amtB);
 
-		if (invariant == 0) {
-				// First liquidity provision - initialize the pool
-				invariant = tokenA_quantity * tokenB_quantity;
-				reserveA = tokenA_quantity;
-				reserveB = tokenB_quantity;
-				// The initial liquidity shares can be set arbitrarily, e.g., to the amount of one token
-				newLiquidityShares = tokenA_quantity; 
-		} else {
-				// Subsequent liquidity provision - ensure the ratio is maintained
-				require(
-						(tokenA_quantity * reserveB) == (tokenB_quantity * reserveA),
-						"Amounts must maintain current pool ratio"
-				);
+        uint256 liquiditySharesMinted;
 
-		// Calculate new LP shares proportionally to the added liquidity
-				newLiquidityShares = (totalLiquidityShares * tokenA_quantity) / reserveA;
+        if (totalLiquidity == 0) {
+            // This is the first liquidity provision
+            // Set initial invariant and mint shares based on the geometric mean
+            invariant = amtA.mul(amtB); // Initial k = x * y
+            require(invariant > 0, "Initial liquidity creates zero invariant"); // Ensure non-zero liquidity
 
-				// Update reserves and invariant
-				reserveA += tokenA_quantity;
-				reserveB += tokenB_quantity;
-				invariant = reserveA * reserveB; 
-		}
+            // Mint LP tokens based on the geometric mean of the initial deposit
+            // This sets the initial "price" of LP tokens.
+            liquiditySharesMinted = Math.sqrt(amtA.mul(amtB));
 
-		// Grant the LP role to the sender
-		_grantRole(LP_ROLE, msg.sender);
-		// Update liquidity share balances
-		liquidityShares[msg.sender] += newLiquidityShares;
-		totalLiquidityShares += newLiquidityShares;
+            // Store the initial reserves.
+            reserveA = amtA;
+            reserveB = amtB;
+
+            // Optional: Lock a small amount of initial liquidity to prevent edge case attacks
+            // Uniswap V2 locks MINIMUM_LIQUIDITY (1000 shares)
+            // if (liquiditySharesMinted > MINIMUM_LIQUIDITY) { // You'd define MINIMUM_LIQUIDITY
+            //     liquiditySharesMinted = liquiditySharesMinted.sub(MINIMUM_LIQUIDITY);
+            //     liquidityProvided[address(0)] = liquidityProvided[address(0)].add(MINIMUM_LIQUIDITY); // Send to burn address
+            // } else {
+            //    revert("Insufficient liquidity for initial deposit after minimum lock");
+            // }
+
+        } else {
+            // Subsequent liquidity provision
+            // Check if amounts are proportional to existing reserves
+            // This is a crucial check to prevent price manipulation and maintain the pool ratio.
+            require(
+                (amtA.mul(reserveB) == amtB.mul(reserveA)),
+                'Amounts must be proportional to existing reserves'
+            );
+
+            // Calculate LP shares to mint proportionally
+            // The formula is: (amount of token you provide) * (total supply of LP tokens) / (total amount in the pool of the token you provided)
+            // We calculate this for both tokens and take the minimum to ensure the ratio is maintained
+            uint256 sharesRatioA = amtA.mul(totalLiquidity).div(reserveA);
+            uint256 sharesRatioB = amtB.mul(totalLiquidity).div(reserveB);
+            liquiditySharesMinted = sharesRatioA < sharesRatioB ? sharesRatioA : sharesRatioB;
+            // The above line is equivalent to Math.min(sharesRatioA, sharesRatioB) if you had a Math.min function.
+
+            require(liquiditySharesMinted > 0, "No liquidity shares minted");
+
+            // Update reserves
+            reserveA = reserveA.add(amtA);
+            reserveB = reserveB.add(amtB);
+
+            // Re-calculate and update the invariant (implicitly includes fees, making it increase)
+            uint256 new_invariant = reserveA.mul(reserveB);
+            require(new_invariant >= invariant, 'Invariant decreased after adding liquidity'); // Sanity check
+            invariant = new_invariant;
+        }
+
+        // Mint LP tokens to the sender
+        liquidityProvided[msg.sender] = liquidityProvided[msg.sender].add(liquiditySharesMinted);
+        totalLiquidity = totalLiquidity.add(liquiditySharesMinted);
+
+
 
 		// end
 		emit LiquidityProvision( msg.sender, amtA, amtB );
