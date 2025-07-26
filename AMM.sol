@@ -59,42 +59,32 @@ contract AMM is AccessControl{
 		//YOUR CODE HERE
 
         address buyToken;
-        uint256 currentReserveIn;  // Use descriptive names for fetched balances
-        uint256 currentReserveOut; // Use descriptive names for fetched balances
+        uint256 currentReserveIn;
+        uint256 currentReserveOut;
 
-        // Determine input and output tokens and fetch their current balances
         if (sellToken == tokenA) {
-            qtyA = sellAmount; // User is selling tokenA
+            qtyA = sellAmount;
             buyToken = tokenB;
             currentReserveIn = IERC20(tokenA).balanceOf(address(this));
             currentReserveOut = IERC20(tokenB).balanceOf(address(this));
-        } else { // sellToken == tokenB
-            qtyB = sellAmount; // User is selling tokenB
+        } else {
+            qtyB = sellAmount;
             buyToken = tokenA;
             currentReserveIn = IERC20(tokenB).balanceOf(address(this));
             currentReserveOut = IERC20(tokenA).balanceOf(address(this));
         }
 
-        // Pull the sellToken from the user
-        // Requires msg.sender to have pre-approved this contract for `sellAmount`
         IERC20(sellToken).transferFrom(msg.sender, address(this), sellAmount);
 
-        // Calculate the amount of buyToken (swapAmt) to send to the user
-        // Using SafeMath for overflow/underflow protection.
-        // The check for positive reserves is still crucial to prevent division by zero.
         require(currentReserveIn > 0 && currentReserveOut > 0, "Insufficient liquidity for calculation");
-
-        uint256 amountInWithFee = sellAmount * (10000 - feebps); // Apply the fee
+        uint256 amountInWithFee = sellAmount * (10000 - feebps);
         uint256 numerator = amountInWithFee * currentReserveOut;
         uint256 denominator = currentReserveIn * 10000 + amountInWithFee;
         swapAmt = numerator / denominator;
 
-
         IERC20(buyToken).transfer(msg.sender, swapAmt);
 
         emit Swap(sellToken, buyToken, sellAmount, swapAmt);
-
-		// Fetch balances again after the swap to calculate the new invariant
 
 		//END
 
@@ -110,17 +100,13 @@ contract AMM is AccessControl{
 		require( amtA > 0 || amtB > 0, 'Cannot provide 0 liquidity' );
 		//YOUR CODE HERE
 
-		// 1. Pull tokens from the sender
         IERC20(tokenA).transferFrom(msg.sender, address(this), amtA);
         IERC20(tokenB).transferFrom(msg.sender, address(this), amtB);
 
-        // Fetch balances after transfer
         uint256 currentPoolBalanceA = IERC20(tokenA).balanceOf(address(this));
         uint256 currentPoolBalanceB = IERC20(tokenB).balanceOf(address(this));
 
-        // Set initial invariant based on the first deposit
-        // Using standard multiplication (*) as Solidity 0.8+ handles overflow
-        invariant = currentPoolBalanceA * currentPoolBalanceB; 
+        invariant = currentPoolBalanceA * currentPoolBalanceB;
         require(invariant > 0, "Initial liquidity results in zero invariant");
 
 		// end
@@ -143,6 +129,4 @@ contract AMM is AccessControl{
 		invariant = ERC20(tokenA).balanceOf(address(this))*ERC20(tokenB).balanceOf(address(this));
 		emit Withdrawal( msg.sender, recipient, amtA, amtB );
 	}
-
-
 }
