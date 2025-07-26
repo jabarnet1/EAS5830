@@ -56,11 +56,7 @@ contract AMM is AccessControl{
 		uint256 qtyB;
 		uint256 swapAmt;
 
-		//YOUR CODE HERE 
-
-		uint256 qtyA;
-        uint256 qtyB;
-        uint256 swapAmt;
+		//YOUR CODE HERE
 
         address buyToken;
         uint256 currentReserveIn;  // Use descriptive names for fetched balances
