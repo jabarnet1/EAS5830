@@ -88,13 +88,7 @@ contract AMM is AccessControl{
         uint256 numerator = amountInWithFee.mul(currentReserveOut);
         uint256 denominator = currentReserveIn.mul(10000).add(amountInWithFee);
         swapAmt = numerator.div(denominator);
-
-        require(swapAmt >= minBuyAmount, "Slippage exceeds minimum accepted");
-
-        // The state variables reserveA and reserveB are no longer directly updated here.
-        // Instead, the token transfers themselves change the actual balances.
-        // The new_invariant calculation will reflect these changes.
-
+		
         IERC20(buyToken).transfer(msg.sender, swapAmt);
 
         emit Swap(sellToken, buyToken, sellAmount, swapAmt);
@@ -130,7 +124,7 @@ contract AMM is AccessControl{
         // IMPORTANT: Without `totalLiquidity` and `liquidityProvided` mappings,
         // it's impossible to track individual LP shares or handle subsequent liquidity additions
         // proportionally. This function essentially becomes a one-time pool initialization.
-		
+
 
 		// end
 		emit LiquidityProvision( msg.sender, amtA, amtB );
