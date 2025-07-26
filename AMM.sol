@@ -115,72 +115,22 @@ contract AMM is AccessControl{
 		require( amtA > 0 || amtB > 0, 'Cannot provide 0 liquidity' );
 		//YOUR CODE HERE
 
-		        // You could allow one if the pool already has liquidity to rebalance,
-        // but for a simple AMM, requiring both is safer.
-
-        // 1. Pull tokens from the sender
+		// 1. Pull tokens from the sender
         IERC20(tokenA).transferFrom(msg.sender, address(this), amtA);
         IERC20(tokenB).transferFrom(msg.sender, address(this), amtB);
 
-        uint256 liquiditySharesMinted;
+        // Fetch balances after transfer
+        uint256 currentPoolBalanceA = IERC20(tokenA).balanceOf(address(this));
+        uint256 currentPoolBalanceB = IERC20(tokenB).balanceOf(address(this));
 
-        if (totalLiquidity == 0) {
-            // This is the first liquidity provision
-            // Set initial invariant and mint shares based on the geometric mean
-            invariant = amtA.mul(amtB); // Initial k = x * y
-            require(invariant > 0, "Initial liquidity creates zero invariant"); // Ensure non-zero liquidity
+        // Set initial invariant based on the first deposit
+        invariant = currentPoolBalanceA.mul(currentPoolBalanceB);
+        require(invariant > 0, "Initial liquidity results in zero invariant");
 
-            // Mint LP tokens based on the geometric mean of the initial deposit
-            // This sets the initial "price" of LP tokens.
-            liquiditySharesMinted = Math.sqrt(amtA.mul(amtB));
-
-            // Store the initial reserves.
-            reserveA = amtA;
-            reserveB = amtB;
-
-            // Optional: Lock a small amount of initial liquidity to prevent edge case attacks
-            // Uniswap V2 locks MINIMUM_LIQUIDITY (1000 shares)
-            // if (liquiditySharesMinted > MINIMUM_LIQUIDITY) { // You'd define MINIMUM_LIQUIDITY
-            //     liquiditySharesMinted = liquiditySharesMinted.sub(MINIMUM_LIQUIDITY);
-            //     liquidityProvided[address(0)] = liquidityProvided[address(0)].add(MINIMUM_LIQUIDITY); // Send to burn address
-            // } else {
-            //    revert("Insufficient liquidity for initial deposit after minimum lock");
-            // }
-
-        } else {
-            // Subsequent liquidity provision
-            // Check if amounts are proportional to existing reserves
-            // This is a crucial check to prevent price manipulation and maintain the pool ratio.
-            require(
-                (amtA.mul(reserveB) == amtB.mul(reserveA)),
-                'Amounts must be proportional to existing reserves'
-            );
-
-            // Calculate LP shares to mint proportionally
-            // The formula is: (amount of token you provide) * (total supply of LP tokens) / (total amount in the pool of the token you provided)
-            // We calculate this for both tokens and take the minimum to ensure the ratio is maintained
-            uint256 sharesRatioA = amtA.mul(totalLiquidity).div(reserveA);
-            uint256 sharesRatioB = amtB.mul(totalLiquidity).div(reserveB);
-            liquiditySharesMinted = sharesRatioA < sharesRatioB ? sharesRatioA : sharesRatioB;
-            // The above line is equivalent to Math.min(sharesRatioA, sharesRatioB) if you had a Math.min function.
-
-            require(liquiditySharesMinted > 0, "No liquidity shares minted");
-
-            // Update reserves
-            reserveA = reserveA.add(amtA);
-            reserveB = reserveB.add(amtB);
-
-            // Re-calculate and update the invariant (implicitly includes fees, making it increase)
-            uint256 new_invariant = reserveA.mul(reserveB);
-            require(new_invariant >= invariant, 'Invariant decreased after adding liquidity'); // Sanity check
-            invariant = new_invariant;
-        }
-
-        // Mint LP tokens to the sender
-        liquidityProvided[msg.sender] = liquidityProvided[msg.sender].add(liquiditySharesMinted);
-        totalLiquidity = totalLiquidity.add(liquiditySharesMinted);
-
-
+        // IMPORTANT: Without `totalLiquidity` and `liquidityProvided` mappings,
+        // it's impossible to track individual LP shares or handle subsequent liquidity additions
+        // proportionally. This function essentially becomes a one-time pool initialization.
+		
 
 		// end
 		emit LiquidityProvision( msg.sender, amtA, amtB );
