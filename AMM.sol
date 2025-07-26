@@ -58,21 +58,25 @@ contract AMM is AccessControl{
 
 		//YOUR CODE HERE 
 
-		address buyToken;
-        uint256 reserveIn;
-        uint256 reserveOut;
+		uint256 qtyA;
+        uint256 qtyB;
+        uint256 swapAmt;
 
-        // Determine input and output tokens and their reserves
+        address buyToken;
+        uint256 currentReserveIn;  // Use descriptive names for fetched balances
+        uint256 currentReserveOut; // Use descriptive names for fetched balances
+
+        // Determine input and output tokens and fetch their current balances
         if (sellToken == tokenA) {
             qtyA = sellAmount; // User is selling tokenA
             buyToken = tokenB;
-            reserveIn = reserveA;
-            reserveOut = reserveB;
+            currentReserveIn = IERC20(tokenA).balanceOf(address(this));
+            currentReserveOut = IERC20(tokenB).balanceOf(address(this));
         } else { // sellToken == tokenB
             qtyB = sellAmount; // User is selling tokenB
             buyToken = tokenA;
-            reserveIn = reserveB;
-            reserveOut = reserveA;
+            currentReserveIn = IERC20(tokenB).balanceOf(address(this));
+            currentReserveOut = IERC20(tokenA).balanceOf(address(this));
         }
 
         // Pull the sellToken from the user
@@ -81,31 +85,25 @@ contract AMM is AccessControl{
 
         // Calculate the amount of buyToken (swapAmt) to send to the user
         // Using SafeMath for overflow/underflow protection.
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity for calculation");
+        // The check for positive reserves is still crucial to prevent division by zero.
+        require(currentReserveIn > 0 && currentReserveOut > 0, "Insufficient liquidity for calculation");
 
         uint256 amountInWithFee = sellAmount.mul(uint256(10000).sub(feebps)); // Apply the fee
-        uint256 numerator = amountInWithFee.mul(reserveOut);
-        uint256 denominator = reserveIn.mul(10000).add(amountInWithFee);
+        uint256 numerator = amountInWithFee.mul(currentReserveOut);
+        uint256 denominator = currentReserveIn.mul(10000).add(amountInWithFee);
         swapAmt = numerator.div(denominator);
 
-        // Slippage protection.
         require(swapAmt >= minBuyAmount, "Slippage exceeds minimum accepted");
 
-        // Update reserves
-        // Using SafeMath for overflow/underflow protection.
-        if (sellToken == tokenA) {
-            reserveA = reserveA.add(qtyA); // Update reserveA with qtyA (which is sellAmount)
-            reserveB = reserveB.sub(swapAmt); // Subtract swapAmt from reserveB
-        } else { // sellToken == tokenB
-            reserveB = reserveB.add(qtyB); // Update reserveB with qtyB (which is sellAmount)
-            reserveA = reserveA.sub(swapAmt); // Subtract swapAmt from reserveA
-        }
+        // The state variables reserveA and reserveB are no longer directly updated here.
+        // Instead, the token transfers themselves change the actual balances.
+        // The new_invariant calculation will reflect these changes.
 
-        // Send the buyToken to the user
-        IERC20(buyToken).transfer(msg.sender, swapAmt); // Send swapAmt to the user
+        IERC20(buyToken).transfer(msg.sender, swapAmt);
 
         emit Swap(sellToken, buyToken, sellAmount, swapAmt);
 
+		// Fetch balances again after the swap to calculate the new invariant
 
 		//END
 
