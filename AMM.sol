@@ -119,13 +119,9 @@ contract AMM is AccessControl{
         uint256 currentPoolBalanceB = IERC20(tokenB).balanceOf(address(this));
 
         // Set initial invariant based on the first deposit
-        invariant = currentPoolBalanceA.mul(currentPoolBalanceB);
+        // Using standard multiplication (*) as Solidity 0.8+ handles overflow
+        invariant = currentPoolBalanceA * currentPoolBalanceB; 
         require(invariant > 0, "Initial liquidity results in zero invariant");
-
-        // IMPORTANT: Without `totalLiquidity` and `liquidityProvided` mappings,
-        // it's impossible to track individual LP shares or handle subsequent liquidity additions
-        // proportionally. This function essentially becomes a one-time pool initialization.
-
 
 		// end
 		emit LiquidityProvision( msg.sender, amtA, amtB );
