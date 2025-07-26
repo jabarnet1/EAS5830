@@ -83,12 +83,10 @@ contract AMM is AccessControl{
         // Using SafeMath for overflow/underflow protection.
         require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity for calculation");
 
-		uint256 feeComplement = 10000..sub(feebps);
-		uint256 amountInWithFee = sellAmount.mul(feeComplement); // Apply the fee
-		
+        uint256 amountInWithFee = sellAmount.mul(uint256(10000).sub(feebps)); // Apply the fee
         uint256 numerator = amountInWithFee.mul(reserveOut);
         uint256 denominator = reserveIn.mul(10000).add(amountInWithFee);
-        swapAmt = numerator.div(denominator); // Assign the calculated amount to swapAmt
+        swapAmt = numerator.div(denominator);
 
         // Slippage protection.
         require(swapAmt >= minBuyAmount, "Slippage exceeds minimum accepted");
