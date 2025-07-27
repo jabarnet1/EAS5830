@@ -24,10 +24,10 @@ contract Source is AccessControl {
 	function deposit(address _token, address _recipient, uint256 _amount ) public {
 		//YOUR CODE
 
-		require(approved[_token], "Token is not registered for bridging");
-		require(_amount > 0, "Deposit amount must be greater than zero");
-        require(_recipient != address(0), "Invalid destination recipient address");
-        require(IERC20(_token).transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+		require(approved[_token], "Token Not Registered");
+		require(_amount > 0, "Invalid Amount");
+        require(_recipient != address(0), "Invalid Address");
+        require(IERC20(_token).transferFrom(msg.sender, address(this), _amount), "Transfer Failure");
 
         emit Deposit(_token, _recipient, _amount);
 	}
@@ -35,11 +35,11 @@ contract Source is AccessControl {
 	function withdraw(address _token, address _recipient, uint256 _amount ) onlyRole(WARDEN_ROLE) public {
 		//YOUR CODE HERE
 
-		require(approved[_token], "Token is not registered for bridging");
-		require(_amount > 0, "Withdrawal amount must be greater than zero");
-        require(_recipient != address(0), "Invalid recipient address");
-        require(IERC20(_token).balanceOf(address(this)) >= _amount, "Insufficient token balance in contract");
-        require(IERC20(_token).transfer(_recipient, _amount), "Token transfer failed during withdrawal");
+		require(approved[_token], "Token Not Registered");
+		require(_amount > 0, "Invalid Amount");
+        require(_recipient != address(0), "Invalid Address");
+        require(IERC20(_token).balanceOf(address(this)) >= _amount, "Insufficient Balance");
+        require(IERC20(_token).transfer(_recipient, _amount), "Transfer Failure");
 
         emit Withdrawal(_token, _recipient, _amount);
 	}
@@ -47,8 +47,8 @@ contract Source is AccessControl {
 	function registerToken(address _token) onlyRole(ADMIN_ROLE) public {
 		//YOUR CODE HERE
 
-		require(_token != address(0), "Invalid token address");
-        require(!approved[_token], "Token already registered");
+		require(_token != address(0), "Invalid Address");
+        require(!approved[_token], "Token Registered");
 
         approved[_token] = true;
         tokens.push(_token);
