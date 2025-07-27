@@ -6,6 +6,9 @@ import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/interfaces/IERC1820Registry.sol";
 import "./MCITR.sol";
 
+// remove after
+import "forge-std/console.sol";
+
 /*
 	A simple Bank contract that is vulnerable to reentrancy attacks
 	The Bank functions similarly to Wrapped ETH (WETH)
@@ -74,6 +77,7 @@ contract Bank is AccessControl, IERC777Recipient {
 	function claimAll() public { 
 
 		// test block remove later
+
 		uint256 amount = balances[msg.sender];
 		require( amount > 0, 'Cannot withdraw 0' );
 		emit Claim( msg.sender, amount );
