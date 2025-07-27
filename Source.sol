@@ -39,7 +39,7 @@ contract Source is AccessControl {
 		require(_amount > 0, "Withdrawal amount must be greater than zero");
         require(_recipient != address(0), "Invalid recipient address");
         require(IERC20(_token).balanceOf(address(this)) >= _amount, "Insufficient token balance in contract");
-        require(IERC20(_tokenAddress).transfer(_recipient, _amount), "Token transfer failed during withdrawal");
+        require(IERC20(_token).transfer(_recipient, _amount), "Token transfer failed during withdrawal");
 
         emit Withdrawal(_token, _recipient, _amount);
 	}
