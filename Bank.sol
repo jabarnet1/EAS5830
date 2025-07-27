@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/interfaces/IERC1820Registry.sol";
 import "./MCITR.sol";
 
-// remove after
-import "forge-std/console.sol";
 
 /*
 	A simple Bank contract that is vulnerable to reentrancy attacks
@@ -77,7 +75,7 @@ contract Bank is AccessControl, IERC777Recipient {
 	function claimAll() public { 
 
 		// test block remove later
-
+		/*
 		uint256 amount = balances[msg.sender];
 		require( amount > 0, 'Cannot withdraw 0' );
 		emit Claim( msg.sender, amount );
@@ -87,17 +85,15 @@ contract Bank is AccessControl, IERC777Recipient {
 		balances[msg.sender] = 0;
 		withdrawals[msg.sender] += amount;
 		console.log("Bank::claimAll after state update. Balances[msg.sender]: %d", balances[msg.sender]); // ADD THIS
-
+		*/
 		// end of test block
 
-		/* Original
 		uint256 amount = balances[msg.sender];
 		require( amount > 0, 'Cannot withdraw 0' );
 		emit Claim( msg.sender, amount );
 		token.mint( msg.sender, amount );
 		balances[msg.sender] = 0;
 		withdrawals[msg.sender] += amount;
-		*/
 	}
 
 	/*
