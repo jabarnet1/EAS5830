@@ -72,12 +72,28 @@ contract Bank is AccessControl, IERC777Recipient {
 	   This function is vulnerable to a reentrancy attack
 	*/
 	function claimAll() public { 
+
+		// test block remove later
+		uint256 amount = balances[msg.sender];
+		require( amount > 0, 'Cannot withdraw 0' );
+		emit Claim( msg.sender, amount );
+		console.log("Bank::claimAll about to mint %d tokens to %s", amount, msg.sender); // ADD THIS
+		token.mint( msg.sender, amount );
+		console.log("Bank::claimAll after mint. Balances[msg.sender]: %d", balances[msg.sender]); // ADD THIS
+		balances[msg.sender] = 0;
+		withdrawals[msg.sender] += amount;
+		console.log("Bank::claimAll after state update. Balances[msg.sender]: %d", balances[msg.sender]); // ADD THIS
+
+		// end of test block
+
+		/* Original
 		uint256 amount = balances[msg.sender];
 		require( amount > 0, 'Cannot withdraw 0' );
 		emit Claim( msg.sender, amount );
 		token.mint( msg.sender, amount );
 		balances[msg.sender] = 0;
 		withdrawals[msg.sender] += amount;
+		*/
 	}
 
 	/*
