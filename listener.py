@@ -53,8 +53,8 @@ def scan_blocks(chain, start_block, end_block, contract_address, eventfile='depo
         print( f"Scanning blocks {start_block} - {end_block} on {chain}" )
 
     # Check Header
-    #file_exists = os.path.exists(eventfile)
-    #header = not file_exists
+    file_exists = os.path.exists(eventfile)
+    header = not file_exists
 
     if end_block - start_block < 30:
         event_filter = contract.events.Deposit.create_filter(from_block=start_block,to_block=end_block,argument_filters=arg_filter)
@@ -72,10 +72,10 @@ def scan_blocks(chain, start_block, end_block, contract_address, eventfile='depo
                 "address": evt.address,
             }
             df_event = pd.DataFrame([data])
-            df_event.to_csv(eventfile, mode='a', index=False, header=False)
-            #df_event.to_csv(eventfile, mode='a', index=False, header=header)
-            #if header:
-            #    header = False
+            #df_event.to_csv(eventfile, mode='a', index=False, header=False)
+            df_event.to_csv(eventfile, mode='a', index=False, header=header)
+            if header:
+                header = False
 
     else:
         for block_num in range(start_block,end_block+1):
@@ -94,10 +94,10 @@ def scan_blocks(chain, start_block, end_block, contract_address, eventfile='depo
                     "address": evt.address,
                 }
                 df_event = pd.DataFrame([data])
-                df_event.to_csv(eventfile, mode='a', index=False, header=False)
-                #df_event.to_csv(eventfile, mode='a', index=False, header=header)
-                #if header:
-                #    header = False
+                #df_event.to_csv(eventfile, mode='a', index=False, header=False)
+                df_event.to_csv(eventfile, mode='a', index=False, header=header)
+                if header:
+                    header = False
 
 
 
