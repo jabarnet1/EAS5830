@@ -52,11 +52,9 @@ def scan_blocks(chain, start_block, end_block, contract_address, eventfile='depo
     else:
         print( f"Scanning blocks {start_block} - {end_block} on {chain}" )
 
-    # added extra
-    # Determine if the header should be written.
-    # It should only be written if the file does not exist yet.
-    file_exists = os.path.exists(eventfile)
-    header_to_write = not file_exists
+    # Check Header
+    #file_exists = os.path.exists(eventfile)
+    #header = not file_exists
 
     if end_block - start_block < 30:
         event_filter = contract.events.Deposit.create_filter(from_block=start_block,to_block=end_block,argument_filters=arg_filter)
@@ -73,15 +71,11 @@ def scan_blocks(chain, start_block, end_block, contract_address, eventfile='depo
                 "transactionHash": evt.transactionHash.hex(),
                 "address": evt.address,
             }
-            # Create a DataFrame for the single event and append
             df_event = pd.DataFrame([data])
-            df_event.to_csv(eventfile, mode='a', index=False, header=header_to_write)
-            if header_to_write:  # Ensure header is written only once
-                header_to_write = False
-
-            print(
-                f"Found and wrote Deposit event: Token={data['token']}, Recipient={data['recipient']}, Amount={data['amount']}, TxHash={data['transactionHash']}")
-
+            df_event.to_csv(eventfile, mode='a', index=False, header=False)
+            #df_event.to_csv(eventfile, mode='a', index=False, header=header)
+            #if header:
+            #    header = False
 
     else:
         for block_num in range(start_block,end_block+1):
@@ -99,16 +93,13 @@ def scan_blocks(chain, start_block, end_block, contract_address, eventfile='depo
                     "transactionHash": evt.transactionHash.hex(),
                     "address": evt.address,
                 }
-                # Create a DataFrame for the single event and append
                 df_event = pd.DataFrame([data])
-                df_event.to_csv(eventfile, mode='a', index=False, header=header_to_write)
-                if header_to_write:  # Ensure header is written only once
-                    header_to_write = False
+                df_event.to_csv(eventfile, mode='a', index=False, header=False)
+                #df_event.to_csv(eventfile, mode='a', index=False, header=header)
+                #if header:
+                #    header = False
 
-                print(
-                    f"Found and wrote Deposit event: Token={data['token']}, Recipient={data['recipient']}, Amount={data['amount']}, TxHash={data['transactionHash']}")
 
-    print(f"Finished scanning blocks from {start_block} to {end_block} on {chain}.")
 
 
 
