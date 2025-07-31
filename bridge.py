@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import time
 
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware  # Necessary for POA chains
@@ -305,6 +306,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     token_address  # The ERC20 token address on the destination chain
                 )
                 print(f"Withdraw transaction confirmed: {w3_source.toHex(tx_receipt.transactionHash)}")
+
+                time.sleep(5)
 
             except Exception as e:
                 print(f"Error sending withdraw transaction: {e}")
