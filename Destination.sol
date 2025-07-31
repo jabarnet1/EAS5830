@@ -63,14 +63,13 @@ contract Destination is AccessControl {
         emit Wrap(_underlying_token, wrappedTokenAddress, _recipient, _amount);
 	}
 
-	function unwrap(address _wrapped_token, address _recipient, uint256 _amount, address _accountToBurnFrom )
+	function unwrap(address _wrapped_token, address _recipient, uint256 _amount)
     public onlyRole(WARDEN_ROLE) {
         // YOUR CODE HERE
 
         require(_wrapped_token != address(0), "Invalid wrapped token address");
         require(_recipient != address(0), "Invalid recipient address");
         require(_amount > 0, "Amount must be greater than zero");
-        require(_accountToBurnFrom != address(0), "Invalid account to burn from");
 
         // mapping
         address underlyingTokenAddress = underlying_tokens[_wrapped_token];
@@ -78,19 +77,11 @@ contract Destination is AccessControl {
         // registration check
         require(underlyingTokenAddress != address(0), "Not a registered wrapped token");
 
-        // Add checks before burning (Recommended)
-        // Ensure _accountToBurnFrom has enough balance
-        require(BridgeToken(_wrapped_token).balanceOf(_accountToBurnFrom) >= _amount, "Unwrap: Insufficient wrapped token balance for account");
-        // Ensure _accountToBurnFrom has given allowance to this contract (msg.sender of unwrap call)
-        // This assumes the relayer (msg.sender) will be initiating the burnFrom on behalf of _accountToBurnFrom.
-        require(BridgeToken(_wrapped_token).allowance(_accountToBurnFrom, msg.sender) >= _amount, "Unwrap: Insufficient allowance from account");
-
-
         // burn
-        BridgeToken(_wrapped_token).burnFrom(_accountToBurnFrom, _amount);
+        BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
         // emit
-        emit Unwrap(underlyingTokenAddress, _wrapped_token, _accountToBurnFrom, _recipient, _amount); // Updated 'frm' to _accountToBurnFrom
+        emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount); // Updated 'frm' to _accountToBurnFrom
     }
 }
 

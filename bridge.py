@@ -306,7 +306,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
             recipient_on_source = event.args['to']  # The recipient on the Source Chain
             amount = event.args['amount']
             underlying_token_address = event.args['underlying_token']  # The original ERC20 token address on Source
-            account_to_burn_from = event.args['frm']  # <<< NEW: Extract the account that burned wrapped tokens
 
             # Build and send the 'withdraw' transaction on the source chain
             try:
@@ -320,8 +319,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     recipient_on_source,
                     amount,
                     underlying_token_address,  # Pass the underlying token address
-                    # You might need to pass account_to_burn_from here if your withdraw function expects it
-                    # For example: account_to_burn_from
                     nonce=current_nonce_source  # Ensure you are managing nonce for source chain too
                 )
                 print(f"Withdraw transaction confirmed: {tx_receipt.transactionHash.hex()}")
