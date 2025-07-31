@@ -112,7 +112,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         print(f"Failed to connect to {chain} chain.")
         return
 
-    contract_details = get_contract_info(chain, contract_info_file)
+    contract_details = get_contract_info(chain, contract_info)
     contract_address = Web3.to_checksum_address(contract_details["address"])
     contract_abi = contract_details["abi"]
     contract = w3.eth.contract(address=contract_address, abi=contract_abi)
@@ -144,13 +144,13 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print("Failed to connect to destination chain for wrapping.")
                 return  # Exit or handle error
 
-            destination_details = get_contract_info('destination', contract_info_file)
+            destination_details = get_contract_info('destination', contract_info)
             destination_contract_address = Web3.to_checksum_address(destination_details["address"])
             destination_contract_abi = destination_details["abi"]
             destination_contract = w3_destination.eth.contract(address=destination_contract_address,
                                                                abi=destination_contract_abi)
 
-            warden_account = w3_destination.eth.account.from_key(warden_private_key)
+            warden_account = w3_destination.eth.account.from_key(private_key)
             w3_destination.eth.default_account = warden_account.address
 
             # --- START NONCE FIX ---
@@ -170,7 +170,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print(f"  Amount: {amount}")
 
                 try:
-                    send_transaction(w3_destination, warden_account, warden_private_key,
+                    send_transaction(w3_destination, warden_account, private_key,
                                      destination_contract, "wrap", token, recipient, amount,
                                      nonce=current_nonce_destination)  # Pass the managed nonce
                     current_nonce_destination += 1  # Increment nonce for the NEXT transaction
@@ -192,12 +192,12 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print("Failed to connect to source chain for withdrawing.")
                 return  # Exit or handle error
 
-            source_details = get_contract_info('source', contract_info_file)
+            source_details = get_contract_info('source', contract_info)
             source_contract_address = Web3.to_checksum_address(source_details["address"])
             source_contract_abi = source_details["abi"]
             source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
 
-            warden_account = w3_source.eth.account.from_key(warden_private_key)
+            warden_account = w3_source.eth.account.from_key(private_key)
             w3_source.eth.default_account = warden_account.address
 
             # --- START NONCE FIX ---
@@ -222,7 +222,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print(f"  Amount: {amount}")
 
                 try:
-                    send_transaction(w3_source, warden_account, warden_private_key,
+                    send_transaction(w3_source, warden_account, private_key,
                                      source_contract, "withdraw", underlying_token, recipient, amount,
                                      nonce=current_nonce_source)
                     current_nonce_source += 1
@@ -231,7 +231,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
             # --- END NEW UNWRAP CALL ---
 
 
-def register_and_create_tokens(warden_private_key, contract_info_file="contract_info.json"):
+def register_and_create_tokens(warden_private_key, contract_info="contract_info.json"):
     print("\n--- Registering and Creating Tokens ---")
 
     # Connect to both chains to avoid reconnecting multiple times in the loop
@@ -242,8 +242,8 @@ def register_and_create_tokens(warden_private_key, contract_info_file="contract_
         print("Failed to connect to both chains. Cannot register/create tokens.")
         return
 
-    source_details = get_contract_info('source', contract_info_file)
-    destination_details = get_contract_info('destination', contract_info_file)
+    source_details = get_contract_info('source', contract_info)
+    destination_details = get_contract_info('destination', contract_info)
 
     source_contract_address = Web3.to_checksum_address(source_details["address"])
     source_contract_abi = source_details["abi"]
@@ -303,4 +303,4 @@ if __name__ == "__main__":
         exit()
 
     # Call the registration function before starting the main listener loop
-    #register_and_create_tokens(private_key)
+    register_and_create_tokens(private_key)
