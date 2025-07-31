@@ -208,7 +208,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
             if is_registered:
                 print(f"Token {token_addr} is already registered on Source. Skipping registration.")
-                continue
+                #continue
 
             print(f"Attempting to register token: {token_addr}")
             tx_receipt = send_transaction(w3_source, deployer_account_source, private_key, source_contract,
