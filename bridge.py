@@ -147,8 +147,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         # Scan for 'Deposit' events
         # Deposit(address indexed token, address indexed recipient, uint256 amount)
         deposit_event_filter = contract.events.Deposit.get_logs(
-            fromBlock=start_block,
-            toBlock=latest_block
+            from_block=start_block,
+            to_block=latest_block
         )
         deposit_events = deposit_event_filter.get_all_entries()
 
@@ -211,8 +211,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         # But based on the shared code, `frm` is likely the 'sender' or 'from' address.
 
         unwrap_event_filter = contract.events.Unwrap.get_logs(
-            fromBlock=start_block,
-            toBlock=latest_block
+            from_block=start_block,
+            to_block=latest_block
         )
         unwrap_events = unwrap_event_filter.get_all_entries()
 
