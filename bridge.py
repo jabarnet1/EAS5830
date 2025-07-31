@@ -269,10 +269,13 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     private_key,
                     destination_contract,
                     'wrap',
-                    recipient,
-                    amount,
-                    token_address  # The ERC20 token address on the source chain
+                    token_address,  # FIRST argument: address (the token on the source chain)
+                    recipient,  # SECOND argument: address (the recipient on the destination chain)
+                    amount,  # THIRD argument: uint256 (the amount)
+                    nonce=current_nonce_destination  # Pass the current nonce if managing manually
+
                 )
+                current_nonce_destination += 1  # Increment nonce if managing manually
                 print(f"Wrap transaction confirmed: {w3_destination.toHex(tx_receipt.transactionHash)}")
 
             except Exception as e:
