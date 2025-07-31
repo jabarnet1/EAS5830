@@ -159,10 +159,12 @@ def scan_blocks(chain, contract_info="contract_info.json"):
             # --- END NONCE FIX ---
 
             for event in deposit_events:
+                print(f"Raw Deposit event: {event}")
                 event_args = event['args']
                 token = event_args['token']
                 recipient = event_args['recipient']
                 amount = event_args['amount']
+                print(f"Extracted amount from Deposit event: {amount}")
 
                 print(f"Detected Deposit event on Source Chain:")
                 print(f"  Token: {token}")
@@ -170,6 +172,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print(f"  Amount: {amount}")
 
                 try:
+                    print(f"Calling wrap with arguments: token={token}, recipient={recipient}, amount={amount}")
                     send_transaction(w3_destination, warden_account, private_key,
                                      destination_contract, "wrap", token, recipient, amount,
                                      nonce=current_nonce_destination)  # Pass the managed nonce
@@ -303,4 +306,4 @@ if __name__ == "__main__":
         exit()
 
     # Call the registration function before starting the main listener loop
-    register_and_create_tokens(private_key)
+    #register_and_create_tokens(private_key)
