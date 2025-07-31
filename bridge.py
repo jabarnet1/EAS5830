@@ -39,19 +39,25 @@ def get_contract_info(chain, contract_info):
 # connect_to and get_contract_info functions here
 
 # Helper function - send_transaction function
-def send_transaction(w3, account, private_key, contract, function_name, *args):
+def send_transaction(w3, account, private_key, contract, function_name, *args, nonce=None): # ADDED 'nonce=None' here
     """
     Helper function to build, sign, and send a transaction to a contract function.
     """
     print(f"\n--- Calling {function_name} on {contract.address} ---")
 
-    # Build the transaction
-    transaction = contract.functions[function_name](*args).build_transaction({
+    tx_params = {
         'chainId': w3.eth.chain_id,
         'from': account.address,
-        'nonce': w3.eth.get_transaction_count(account.address),
         'gasPrice': w3.eth.gas_price
-    })
+    }
+
+    if nonce is not None: # Use provided nonce if available
+        tx_params['nonce'] = nonce
+    else: # Otherwise, fetch it
+        tx_params['nonce'] = w3.eth.get_transaction_count(account.address)
+
+    # Build the transaction
+    transaction = contract.functions[function_name](*args).build_transaction(tx_params)
 
     # Estimate gas (optional but recommended)
     gas_limit = w3.eth.estimate_gas(transaction)
@@ -74,6 +80,7 @@ def send_transaction(w3, account, private_key, contract, function_name, *args):
     return tx_receipt
 
 
+
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
         chain - (string) should be either "source" or "destination"
@@ -92,9 +99,17 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
 
     # --- Load Environment Variables (needed for private key) ---
-    private_key = os.getenv("PRIVATE_KEY")
-    if not private_key:
-        raise ValueError("PRIVATE_KEY environment variable must be set.")
+    #private_key = os.getenv("PRIVATE_KEY")
+    #if not private_key:
+    #    raise ValueError("PRIVATE_KEY environment variable must be set.")
+
+    # If the file is empty, it will raise an exception
+    with open("secret_key.txt", "r") as f:
+        # Read all lines, then take the first element (the first line) and strip it
+        private_key_list = f.readlines()
+        assert (len(private_key_list) > 0), "Your account secret_key.txt is empty"
+
+        private_key = private_key_list[0].strip()
 
     # --- Setup current chain connection and contract ---
     w3_source = connect_to('source')  # Establish connection to source chain
@@ -170,23 +185,56 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
     # Register Tokens on Source Contract (Avalanche Fuji)
     print(f"\n--- Registering tokens on Source Contract at {source_contract_address} (Avalanche Fuji) ---")
+
+    # Fetch initial nonce for the source account once before the loop
+    current_nonce_source = w3_source.eth.get_transaction_count(deployer_account_source.address)
+
     for token_addr in source_token_addresses_to_register:
+        # Removed the isTokenRegistered check here
+
         print(f"Attempting to register token: {token_addr}")
         try:
             tx_receipt = send_transaction(w3_source, deployer_account_source, private_key, source_contract,
-                                          'registerToken', token_addr)
-            # Add a check here if the autograder requires it, e.g., print(f"Register token tx status: {tx_receipt.status}")
+                                          'registerToken', token_addr, nonce=current_nonce_source)  # Pass nonce
+            current_nonce_source += 1  # Increment nonce
+
+            if tx_receipt.status == 1:
+                print(f"Successfully registered token {token_addr} on Source.")
+            else:
+                print(f"Failed to register token {token_addr} on Source. Tx Status: {tx_receipt.status}")
         except Exception as e:
+            # This catch will now likely show the "execution reverted: Token Registered" error again
             print(f"Error registering token {token_addr} on Source: {e}")
 
     # Create Tokens on Destination Contract (BNB Testnet)
     print(f"\n--- Creating tokens on Destination Contract at {destination_contract_address} (BNB Testnet) ---")
+
+    # --- Fetch initial nonce for the destination account once before the loop ---
+    current_nonce_destination = w3_destination.eth.get_transaction_count(deployer_account_destination.address)
+    print(f"Initial nonce for Destination account {deployer_account_destination.address}: {current_nonce_destination}")
+
     for token_addr in destination_token_addresses_to_create:
         print(f"Attempting to create token: {token_addr}")
         try:
+            token_name = "Wrapped Token " + token_addr[:6]  # Example: Generate a name
+            token_symbol = "WTOK"  # Example: Generate a symbol
+
+            # Call send_transaction with the explicit nonce
             tx_receipt = send_transaction(w3_destination, deployer_account_destination, private_key,
-                                          destination_contract, 'createToken', token_addr)
-            # Add a check here if the autograder requires it, e.g., print(f"Create token tx status: {tx_receipt.status}")
+                                          destination_contract, 'createToken',
+                                          token_addr,  # First argument: address
+                                          token_name,  # Second argument: string
+                                          token_symbol,  # Third argument: string
+                                          nonce=current_nonce_destination  # Pass the current nonce
+                                          )
+            # Increment nonce for the next transaction in this loop
+            current_nonce_destination += 1
+
+            if tx_receipt.status == 1:
+                print(f"Successfully created token {token_addr} on Destination.")
+            else:
+                print(f"Failed to create token {token_addr} on Destination. Tx Status: {tx_receipt.status}")
+
         except Exception as e:
             print(f"Error creating token {token_addr} on Destination: {e}")
 
@@ -204,7 +252,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
     if chain == 'source':
         # Listen for 'Deposit' events on the source chain
-        deposit_events = current_contract.events.Deposit.getLogs(fromBlock=from_block, toBlock=current_block)
+        deposit_events = current_contract.events.Deposit.get_logs(from_block=from_block, to_block=current_block)
         for event in deposit_events:
             print(f"Deposit Event found on Source Chain: {event.args}")
             # Extract necessary information from the event
@@ -232,7 +280,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
     elif chain == 'destination':
         # Listen for 'Unwrap' events on the destination chain
-        unwrap_events = current_contract.events.Unwrap.getLogs(fromBlock=from_block, toBlock=current_block)
+        unwrap_events = current_contract.events.Unwrap.get_logs(from_block=from_block, to_block=current_block)
         for event in unwrap_events:
             print(f"Unwrap Event found on Destination Chain: {event.args}")
             # Extract necessary information from the event
@@ -259,3 +307,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print(f"Error sending withdraw transaction: {e}")
 
     return {}  # Return an empty dict consistent with get_contract_info's failure return.
+
+if __name__ == "__main__":
+    scan_blocks("source")
