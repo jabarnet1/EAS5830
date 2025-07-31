@@ -277,7 +277,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
                 )
                 current_nonce_destination += 1  # Increment nonce if managing manually
-                print(f"Wrap transaction confirmed: {w3_destination.toHex(tx_receipt.transactionHash)}")
+                print(f"Wrap transaction confirmed: {tx_receipt.transactionHash.hex()}")
 
             except Exception as e:
                 print(f"Error sending wrap transaction: {e}")
@@ -305,7 +305,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     amount,
                     token_address  # The ERC20 token address on the destination chain
                 )
-                print(f"Withdraw transaction confirmed: {w3_source.toHex(tx_receipt.transactionHash)}")
+                print(f"Withdraw transaction confirmed: {tx_receipt.transactionHash.hex()}")
 
                 time.sleep(5)
 
