@@ -15,7 +15,7 @@ def deploy_contract(w3, account, private_key, contract_artifact_filename, constr
 
     # Construct the path to the artifact JSON file
     # Assumes artifacts folder is in the same directory as this script
-    artifact_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts", contract_artifact_filename)
+    artifact_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts2", contract_artifact_filename)
 
     if not os.path.exists(artifact_path):
         raise FileNotFoundError(f"Artifact file not found: {artifact_path}. Please compile your contract in Remix Desktop and save the bytecode/ABI to this file.")
