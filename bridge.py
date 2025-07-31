@@ -1,9 +1,9 @@
-from web3 import Web3
-from web3.providers.rpc import HTTPProvider
-from web3.middleware import ExtraDataToPOAMiddleware #Necessary for POA chains
-from datetime import datetime
+import csv
 import json
-import pandas as pd
+import os
+
+from web3 import Web3
+from web3.middleware import ExtraDataToPOAMiddleware  # Necessary for POA chains
 
 
 def connect_to(chain):
@@ -34,6 +34,45 @@ def get_contract_info(chain, contract_info):
     return contracts[chain]
 
 
+# ... other imports ...
+
+# connect_to and get_contract_info functions here
+
+# Helper function - send_transaction function
+def send_transaction(w3, account, private_key, contract, function_name, *args):
+    """
+    Helper function to build, sign, and send a transaction to a contract function.
+    """
+    print(f"\n--- Calling {function_name} on {contract.address} ---")
+
+    # Build the transaction
+    transaction = contract.functions[function_name](*args).build_transaction({
+        'chainId': w3.eth.chain_id,
+        'from': account.address,
+        'nonce': w3.eth.get_transaction_count(account.address),
+        'gasPrice': w3.eth.gas_price
+    })
+
+    # Estimate gas (optional but recommended)
+    gas_limit = w3.eth.estimate_gas(transaction)
+    transaction['gas'] = gas_limit
+
+    # Sign the transaction
+    signed_txn = w3.eth.account.sign_transaction(transaction, private_key=private_key)
+
+    # Send the transaction
+    tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+    print(f"Transaction sent! Hash: {tx_hash.hex()}")
+
+    # Wait for the transaction to be mined
+    tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    print(f"Transaction confirmed in block: {tx_receipt.blockNumber}")
+    if tx_receipt.status == 1:
+        print(f"Transaction successful!")
+    else:
+        print(f"Transaction failed!")
+    return tx_receipt
+
 
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
@@ -51,112 +90,156 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     
         #YOUR CODE HERE
 
-        w3 = connect_to(chain)
-        contract_details = get_contract_info(chain, contract_info)
-        contract_address = Web3.toChecksumAddress(contract_details['address'])
-        contract_abi = contract_details['abi']
-        contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 
-        current_block = w3.eth.block_number
-        # Scan the last 5 blocks
-        from_block = max(0, current_block - 5)
+    # --- Load Environment Variables (needed for private key) ---
+    private_key = os.getenv("PRIVATE_KEY")
+    if not private_key:
+        raise ValueError("PRIVATE_KEY environment variable must be set.")
 
-        print(f"Scanning {chain} chain from block {from_block} to {current_block}...")
+    # --- Setup current chain connection and contract ---
+    w3_source = connect_to('source')  # Establish connection to source chain
+    w3_destination = connect_to('destination')  # Establish connection to destination chain
 
-        if chain == 'source':
-            # Listen for 'Deposit' events on the source chain
-            deposit_events = contract.events.Deposit.getLogs(fromBlock=from_block, toBlock=current_block)
-            for event in deposit_events:
-                print(f"Deposit Event found on Source Chain: {event.args}")
-                # Extract necessary information from the event
-                recipient = event.args['recipient']
-                amount = event.args['amount']
-                token_address = event.args['token']  # Assuming the event includes the token address
+    if not w3_source.is_connected():
+        print(f"Failed to connect to source chain.")
+        return {}
+    if not w3_destination.is_connected():
+        print(f"Failed to connect to destination chain.")
+        return {}
 
-                # Connect to the destination chain (BNB Testnet)
-                w3_destination = connect_to('destination')
-                destination_contract_details = get_contract_info('destination', contract_info)
-                destination_contract_address = Web3.toChecksumAddress(destination_contract_details['address'])
-                destination_contract_abi = destination_contract_details['abi']
-                destination_contract = w3_destination.eth.contract(address=destination_contract_address,
-                                                                   abi=destination_contract_abi)
+    deployer_account_source = w3_source.eth.account.from_key(private_key)
+    w3_source.eth.default_account = deployer_account_source.address
+    # print(f"Connected to Source Chain (Avalanche Fuji). Deployer: {deployer_account_source.address}") # Already printed in connect_to
 
-                # Build and send the 'wrap' transaction on the destination chain
-                try:
-                    # The wardens signing key is needed to sign the transaction
-                    account = w3_destination.eth.account.from_key(WARDEN_PRIVATE_KEY)
-                    w3_destination.eth.default_account = account.address
+    deployer_account_destination = w3_destination.eth.account.from_key(private_key)
+    w3_destination.eth.default_account = deployer_account_destination.address
+    # print(f"Connected to Destination Chain (BNB Testnet). Deployer: {deployer_account_destination.address}") # Already printed in connect_to
 
-                    # Build the transaction
-                    nonce = w3_destination.eth.get_transaction_count(account.address)
-                    # The wrap function will need to be called with the appropriate arguments.
-                    # In a real scenario, you'd verify the message signature from the source chain
-                    # and use that to authorize the wrap on the destination.
-                    # For this assignment, we're assuming the listener acts as the trusted warden.
-                    # You'll likely need to pass the source contract's token address and the recipient/amount
-                    # based on your contract's 'wrap' function signature.
-                    # Example:
-                    tx_hash = destination_contract.functions.wrap(
-                        recipient,
-                        amount,
-                        token_address  # The ERC20 token address on the source chain
-                    ).transact({
-                        'from': account.address,
-                        'nonce': nonce,
-                        'gas': 2000000,  # Adjust gas limit as needed
-                        'gasPrice': w3_destination.eth.gas_price
-                    })
-                    print(f"Wrap transaction sent on Destination Chain: {w3_destination.toHex(tx_hash)}")
-                    w3_destination.eth.wait_for_transaction_receipt(tx_hash)
-                    print(f"Wrap transaction confirmed: {w3_destination.toHex(tx_hash)}")
-                except Exception as e:
-                    print(f"Error sending wrap transaction: {e}")
+    # --- Load Contract Information from contract_info.json ---
+    source_info = get_contract_info('source', contract_info)
+    destination_info = get_contract_info('destination', contract_info)
 
-        elif chain == 'destination':
-            # Listen for 'Unwrap' events on the destination chain
-            unwrap_events = contract.events.Unwrap.getLogs(fromBlock=from_block, toBlock=current_block)
-            for event in unwrap_events:
-                print(f"Unwrap Event found on Destination Chain: {event.args}")
-                # Extract necessary information from the event
-                recipient = event.args['recipient']
-                amount = event.args['amount']
-                token_address = event.args['token']  # The destination chain's token address
+    if not source_info or not destination_info:
+        print("Failed to load contract information. Exiting scan_blocks.")
+        return {}
 
-                # Connect to the source chain (AVAX Testnet)
-                w3_source = connect_to('source')
-                source_contract_details = get_contract_info('source', contract_info)
-                source_contract_address = Web3.toChecksumAddress(source_contract_details['address'])
-                source_contract_abi = source_contract_details['abi']
-                source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
+    source_contract_address = source_info['address']
+    source_contract_abi = source_info['abi']
+    destination_contract_address = destination_info['address']
+    destination_contract_abi = destination_info['abi']
 
-                # Build and send the 'withdraw' transaction on the source chain
-                try:
-                    account = w3_source.eth.account.from_key(WARDEN_PRIVATE_KEY)
-                    w3_source.eth.default_account = account.address
+    # --- Instantiate Contracts ---
+    source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
+    destination_contract = w3_destination.eth.contract(address=destination_contract_address, abi=destination_contract_abi)
 
-                    nonce = w3_source.eth.get_transaction_count(account.address)
-                    # Similar to 'wrap', you'll need to pass the appropriate arguments to 'withdraw'
-                    # Example:
-                    tx_hash = source_contract.functions.withdraw(
-                        recipient,
-                        amount,
-                        token_address  # The ERC20 token address on the destination chain
-                    ).transact({
-                        'from': account.address,
-                        'nonce': nonce,
-                        'gas': 2000000,  # Adjust gas limit as needed
-                        'gasPrice': w3_source.eth.gas_price
-                    })
-                    print(f"Withdraw transaction sent on Source Chain: {w3_source.toHex(tx_hash)}")
-                    w3_source.eth.wait_for_transaction_receipt(tx_hash)
-                    print(f"Withdraw transaction confirmed: {w3_source.toHex(tx_hash)}")
-                except Exception as e:
-                    print(f"Error sending withdraw transaction: {e}")
+    # This addresses: Register the appropriate ERC20 tokens by calling the "registerToken()"
+    # function on your Source contract, and "createToken()" on your Destination contract
+    # with the two token relevant token addresses that are in the erc20s.csv
 
+    # Load ERC20 Token Addresses from erc20s.csv
+    erc20s_csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "erc20s.csv")
+    if not os.path.exists(erc20s_csv_path):
+        raise FileNotFoundError(f"erc20s.csv not found at {erc20s_csv_path}. Please create this file.")
 
+    token_addresses = []
+    with open(erc20s_csv_path, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            if row and row[0].strip():  # Ensure row is not empty and first element has content
+                token_addresses.append(
+                    w3_source.to_checksum_address(row[0].strip()))  # row[0] if expecting only one column
 
+    if not token_addresses:
+        print("Warning: No ERC20 token addresses found in erc20s.csv. No tokens will be registered/created.")
 
+    # Register Tokens on Source Contract (Avalanche Fuji)
+    print(f"\n--- Registering tokens on Source Contract at {source_contract_address} (Avalanche Fuji) ---")
+    for token_addr in token_addresses:
+        print(f"Attempting to register token: {token_addr}")
+        try:
+            # Assumes Source.sol has a public/external function 'registerToken(address token)'
+            send_transaction(w3_source, deployer_account_source, private_key, source_contract, 'registerToken',
+                             token_addr)
+        except Exception as e:
+            print(f"Error registering token {token_addr} on Source: {e}")
 
+    # Create Tokens on Destination Contract (BNB Testnet)
+    print(f"\n--- Creating tokens on Destination Contract at {destination_contract_address} (BNB Testnet) ---")
+    for token_addr in token_addresses:
+        print(f"Attempting to create token: {token_addr}")
+        try:
+            # Assumes Destination.sol has a public/external function 'createToken(address token)'
+            send_transaction(w3_destination, deployer_account_destination, private_key, destination_contract,
+                             'createToken', token_addr)
+        except Exception as e:
+            print(f"Error creating token {token_addr} on Destination: {e}")
 
+    print("\nToken registration/creation process complete for all tokens in erc20s.csv.")
 
+    # --- Start of Block Scanning Logic ---
+    current_w3 = w3_source if chain == 'source' else w3_destination
+    current_contract = source_contract if chain == 'source' else destination_contract
+    current_account = deployer_account_source if chain == 'source' else deployer_account_destination
 
+    current_block = current_w3.eth.block_number
+    from_block = max(0, current_block - 5)
+
+    print(f"\n--- Scanning {chain} chain from block {from_block} to {current_block} for bridge events ---")
+
+    if chain == 'source':
+        # Listen for 'Deposit' events on the source chain
+        deposit_events = current_contract.events.Deposit.getLogs(fromBlock=from_block, toBlock=current_block)
+        for event in deposit_events:
+            print(f"Deposit Event found on Source Chain: {event.args}")
+            # Extract necessary information from the event
+            recipient = event.args['recipient']
+            amount = event.args['amount']
+            token_address = event.args['token']  # Assuming the event includes the token address
+
+            # Build and send the 'wrap' transaction on the destination chain
+            try:
+                # Call the top-level send_transaction helper
+                tx_receipt = send_transaction(
+                    w3_destination,
+                    deployer_account_destination,  # Use the deployer account for the destination chain
+                    private_key,
+                    destination_contract,
+                    'wrap',
+                    recipient,
+                    amount,
+                    token_address  # The ERC20 token address on the source chain
+                )
+                print(f"Wrap transaction confirmed: {w3_destination.toHex(tx_receipt.transactionHash)}")
+
+            except Exception as e:
+                print(f"Error sending wrap transaction: {e}")
+
+    elif chain == 'destination':
+        # Listen for 'Unwrap' events on the destination chain
+        unwrap_events = current_contract.events.Unwrap.getLogs(fromBlock=from_block, toBlock=current_block)
+        for event in unwrap_events:
+            print(f"Unwrap Event found on Destination Chain: {event.args}")
+            # Extract necessary information from the event
+            recipient = event.args['recipient']
+            amount = event.args['amount']
+            token_address = event.args['token']  # The destination chain's token address
+
+            # Build and send the 'withdraw' transaction on the source chain
+            try:
+                # Call the top-level send_transaction helper
+                tx_receipt = send_transaction(
+                    w3_source,
+                    deployer_account_source,  # Use the deployer account for the source chain
+                    private_key,
+                    source_contract,
+                    'withdraw',
+                    recipient,
+                    amount,
+                    token_address  # The ERC20 token address on the destination chain
+                )
+                print(f"Withdraw transaction confirmed: {w3_source.toHex(tx_receipt.transactionHash)}")
+
+            except Exception as e:
+                print(f"Error sending withdraw transaction: {e}")
+
+    return {}  # Return an empty dict consistent with get_contract_info's failure return.

@@ -23,23 +23,14 @@ contract BridgeToken is ERC20, ERC20Burnable, AccessControl {
         _burn(account, amount);
     }
 
-    // This is the function called indirectly by Destination::unwrap
-    // when using `wrappedTokenInstance.burn(_amount)`.
-    // ERC20Burnable's burn() function will internally call _burn(msg.sender, amount).
-    // Adding console logs here will allow inspecting the final stage before the revert.
-    function _burn(address account, uint256 amount) internal override {
-        uint256 accountBalance = ERC20.balanceOf(account); // Explicitly get balance here
-        require(accountBalance >= amount, "ERC20: burn amount exceeds balance - from _burn"); // Custom require for debugging
-        super._burn(account, amount); // Call the parent's _burn function
-    }
-
     function burnFrom(address account, uint256 amount) public override {
+		/*
+		   Override OpenZeppelin's burnFrom function to allow the MINTER_ROLE to burn without an allowance
+		*/
 		if( ! hasRole(MINTER_ROLE,msg.sender) ) {
 			_spendAllowance(account, _msgSender(), amount);
-		} else {
-            //console.log("BridgeToken: burnFrom - msg.sender IS MINTER_ROLE. No allowance check needed.");
-        }
-        _burn(account, amount); // This will call the overridden _burn function above
+		}
+        _burn(account, amount);
     }
 }
 
