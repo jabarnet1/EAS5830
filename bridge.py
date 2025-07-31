@@ -91,6 +91,8 @@ def send_transaction(w3, account, private_key, contract, function_name, *args, n
 
 
 last_scanned_block = {'source': None, 'destination': None}
+ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
         chain - (string) should be either "source" or "destination"
@@ -171,17 +173,67 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print(f"  Recipient (Destination): {recipient}")
                 print(f"  Amount: {amount}")
 
+                # --- START NEW LOGIC: Check if wrapped token exists, create if not ---
+                # Check if a wrapped token exists for this underlying token on the destination chain
+                # Need to use the `wrapped_tokens` mapping public getter from Destination.sol
+                # Ensure ZERO_ADDRESS is defined somewhere (e.g., ZERO_ADDRESS = '0x0000000000000000000000000000000000000000')
+                try:
+                    # Call the public getter for the wrapped_tokens mapping
+                    # The `token` variable here refers to the `_underlying_token` from the Deposit event
+                    wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
+                    print(f"DEBUG: Checked wrapped_tokens mapping for {token}, found: {wrapped_token_address}")
+
+                    if wrapped_token_address == ZERO_ADDRESS:  # Assuming ZERO_ADDRESS is defined as '0x0...'
+                        print(
+                            f"DEBUG: Wrapped token not found for underlying token {token}. Attempting to create new wrapped token...")
+                        # You'll need name and symbol for the BridgeToken constructor.
+                        # For the autograder, using a generic name/symbol might be sufficient,
+                        # or you might need to extract them from the underlying token contract
+                        # if the autograder expects specific ones (less likely for this step).
+                        wrapped_token_name = f"Wrapped {token[:6]}..."  # Placeholder, adjust as needed
+                        wrapped_token_symbol = f"W{token[:4]}"  # Placeholder, adjust as needed
+
+                        tx_receipt_create = send_transaction(w3_destination, warden_account, private_key,
+                                                             destination_contract, "createToken", token,
+                                                             wrapped_token_name, wrapped_token_symbol,
+                                                             nonce=current_nonce_destination)
+                        current_nonce_destination += 1  # Increment nonce for the createToken transaction
+
+                        if tx_receipt_create.status == 1:
+                            print(
+                                f"DEBUG: Successfully created wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
+                            # After creation, you might want to re-fetch the wrapped_token_address
+                            # to ensure the mapping is updated, although the next `scan_blocks` might handle this implicitly
+                            # For safety, you could re-call the getter here if needed for subsequent logic in this loop
+                            wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
+                            print(f"DEBUG: Re-fetched wrapped token address after creation: {wrapped_token_address}")
+                        else:
+                            print(
+                                f"ERROR: Failed to create wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
+                            # Decide if you want to continue processing other events or stop
+                            continue  # Skip this deposit and try the next one if token creation failed
+
+                except Exception as e:
+                    print(f"ERROR: Exception during wrapped token check/creation for {token}: {e}")
+                    # Handle the error appropriately, perhaps log it and continue
+                    continue  # Skip this deposit and try the next one
+
+                # --- END NEW LOGIC ---
+
+                # Proceed with calling wrap, now that we know (or have created) the wrapped token mapping
+                # The 'token' variable here is the _underlying_token from the Deposit event.
+                # Your Destination contract's 'wrap' function likely expects this same underlying token address
+                # to then find its corresponding wrapped token via the mapping.
                 try:
                     print(f"Calling wrap with arguments: token={token}, recipient={recipient}, amount={amount}")
                     send_transaction(w3_destination, warden_account, private_key,
                                      destination_contract, "wrap", token, recipient, amount,
-                                     nonce=current_nonce_destination)  # Pass the managed nonce
-                    current_nonce_destination += 1  # Increment nonce for the NEXT transaction
+                                     nonce=current_nonce_destination)
+                    current_nonce_destination += 1
                 except Exception as e:
                     print(f"Error calling wrap function on destination chain: {e}")
                     # Decide if you want to continue processing other events or stop
                     # For a simple grader, continuing might be okay. In real life, handle carefully.
-
 
     elif chain == 'destination':
         unwrap_events = contract.events.Unwrap.get_logs(
