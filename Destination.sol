@@ -57,25 +57,29 @@ contract Destination is AccessControl {
         require(wrappedTokenAddress != address(0), "Wrapped token not registered for this underlying token");
 
         // mint
-        BridgeToken(wrappedTokenAddress).mint(_recipient, _amount);
+        BridgeToken(wrappedTokenAddress).mint(address(this), _amount); // Mint to the bridge contract itself
 
         // emit
         emit Wrap(_underlying_token, wrappedTokenAddress, _recipient, _amount);
+
 	}
 
     function unwrap(address _wrapped_token, address _recipient, uint256 _amount)
     public onlyRole(WARDEN_ROLE) {
-        require(_wrapped_token != address(0), "Invalid wrapped token address");
-        require(_recipient != address(0), "Invalid recipient address");
-        require(_amount > 0, "Amount must be greater than zero");
+    require(_wrapped_token != address(0), "Invalid wrapped token address");
+    require(_recipient != address(0), "Invalid recipient address");
+    require(_amount > 0, "Amount must be greater than zero");
 
-        address underlyingTokenAddress = underlying_tokens[_wrapped_token];
-        require(underlyingTokenAddress != address(0), "Not a registered wrapped token");
+    address underlyingTokenAddress = underlying_tokens[_wrapped_token];
+    require(underlyingTokenAddress != address(0), "Not a registered wrapped token");
 
-        BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
+    // The Destination contract burns its own tokens, it is the MINTER_ROLE for the BridgeToken
+    // Since it's burning from itself, you can use _burn or the public burn function inherited from ERC20Burnable.
+    //BridgeToken(_wrapped_token).burn(_amount); // Use the burn function that burns from msg.sender (which is address(this) for this call)
+    BridgeToken(_wrapped_token).burnFrom(address(this), _amount);
 
-        emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
-    }
+    emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
+}
 }
 
 
