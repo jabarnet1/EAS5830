@@ -191,12 +191,17 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     current_nonce_source = w3_source.eth.get_transaction_count(deployer_account_source.address)
 
     for token_addr in source_token_addresses_to_register:
-        # Removed the isTokenRegistered check here
-
-        print(f"Attempting to register token: {token_addr}")
         try:
+            # Check if the token is already registered using the 'approved' getter
+            is_registered = source_contract.functions.approved(token_addr).call()  # <<< CHANGE THIS LINE
+            if is_registered:
+                print(
+                    f"Token {token_addr} is already registered on Source. Skipping registration as it's already complete.")
+                continue  # Skip to the next token
+
+            print(f"Attempting to register token: {token_addr}")
             tx_receipt = send_transaction(w3_source, deployer_account_source, private_key, source_contract,
-                                          'registerToken', token_addr, nonce=current_nonce_source)  # Pass nonce
+                                          'registerToken', token_addr, nonce=current_nonce_source)
             current_nonce_source += 1  # Increment nonce
 
             if tx_receipt.status == 1:
@@ -204,7 +209,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
             else:
                 print(f"Failed to register token {token_addr} on Source. Tx Status: {tx_receipt.status}")
         except Exception as e:
-            # This catch will now likely show the "execution reverted: Token Registered" error again
             print(f"Error registering token {token_addr} on Source: {e}")
 
     # Create Tokens on Destination Contract (BNB Testnet)
