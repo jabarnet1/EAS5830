@@ -146,7 +146,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     if chain == 'source':
         # Scan for 'Deposit' events
         # Deposit(address indexed token, address indexed recipient, uint256 amount)
-        deposit_event_filter = contract.events.Deposit.create_filter(
+        deposit_event_filter = contract.events.Deposit.get_logs(
             fromBlock=start_block,
             toBlock=latest_block
         )
@@ -210,7 +210,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         # and the event reflects `frm`, you might need to adapt.
         # But based on the shared code, `frm` is likely the 'sender' or 'from' address.
 
-        unwrap_event_filter = contract.events.Unwrap.create_filter(
+        unwrap_event_filter = contract.events.Unwrap.get_logs(
             fromBlock=start_block,
             toBlock=latest_block
         )
@@ -297,7 +297,7 @@ def register_and_create_tokens(warden_private_key, contract_info_file="contract_
             chain_name = row[0]  # Gets 'avax' or 'bsc'
             token_address_str = row[1]  # Gets the token address string
             token_address = Web3.to_checksum_address(token_address_str)
-            
+
             # You might need to infer or provide names/symbols.
             # For assignment, a simple naming might suffice.
             wrapped_token_name = f"Wrapped ERC20 {token_address_str[:6]}..."
@@ -332,4 +332,4 @@ if __name__ == "__main__":
         exit()
 
     # Call the registration function before starting the main listener loop
-    register_and_create_tokens(private_key)
+    #register_and_create_tokens(private_key)
