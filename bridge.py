@@ -191,18 +191,22 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     current_nonce_source = w3_source.eth.get_transaction_count(deployer_account_source.address)
 
     # debug only
-    EXPECTED_TOKEN_FOR_AUTOGRADER = "0xc677c31AD31F73A5290f5ef067F8CEF8d301e45c"
+    #EXPECTED_TOKEN_FOR_AUTOGRADER = "0xc677c31AD31F73A5290f5ef067F8CEF8d301e45c"
 
     for token_addr in source_token_addresses_to_register:
         try:
             # Check if the token is already registered using the 'approved' getter
             is_registered = source_contract.functions.approved(token_addr).call()  # <<< CHANGE THIS LINE
 
-            if token_addr == Web3.to_checksum_address(EXPECTED_TOKEN_FOR_AUTOGRADER) and is_registered:
-                # Special message for the autograder
-                print(f"SUCCESS: Token {token_addr} is registered and ready.")
-                continue  # Then skip the call
-            elif is_registered:
+            #if token_addr == Web3.to_checksum_address(EXPECTED_TOKEN_FOR_AUTOGRADER) and is_registered:
+            #    # Special message for the autograder
+            #    print(f"SUCCESS: Token {token_addr} is registered and ready.")
+            #    continue  # Then skip the call
+            #elif is_registered:
+            #    print(f"Token {token_addr} is already registered on Source. Skipping registration.")
+            #    continue
+
+            if is_registered:
                 print(f"Token {token_addr} is already registered on Source. Skipping registration.")
                 continue
 
