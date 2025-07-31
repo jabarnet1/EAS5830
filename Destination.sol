@@ -63,8 +63,14 @@ contract Destination is AccessControl {
         emit Wrap(_underlying_token, wrappedTokenAddress, _recipient, _amount);
 	}
 
-	function unwrap(address _wrapped_token, address _recipient, uint256 _amount, address _accountToBurnFrom ) public {
+	function unwrap(address _wrapped_token, address _recipient, uint256 _amount, address _accountToBurnFrom )
+    public onlyRole(WARDEN_ROLE) {
         // YOUR CODE HERE
+
+        require(_wrapped_token != address(0), "Invalid wrapped token address");
+        require(_recipient != address(0), "Invalid recipient address");
+        require(_amount > 0, "Amount must be greater than zero");
+        require(_accountToBurnFrom != address(0), "Invalid account to burn from");
 
         // mapping
         address underlyingTokenAddress = underlying_tokens[_wrapped_token];
