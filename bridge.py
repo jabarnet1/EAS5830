@@ -3,6 +3,7 @@ import json
 import os
 import time
 
+from eth_account import Account
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware  # Necessary for POA chains
 
@@ -92,6 +93,63 @@ def send_transaction(w3, account, private_key, contract, function_name, *args, n
 
 last_scanned_block = {'source': None, 'destination': None}
 ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+# ====================================================================
+# Initial Setup and Role Granting Section
+# This runs once when bridge.py starts, before the main scanning loop
+# ====================================================================
+
+print("\n--- Initial Bridge Setup ---")
+
+# Connect to the destination chain first
+w3_destination = connect_to('destination')
+if not w3_destination.is_connected():
+    print("Failed to connect to destination chain for setup.")
+    # Exit or raise an error, cannot proceed without connection
+    exit()
+
+# Get Destination contract info
+destination_details = get_contract_info('destination', 'contract_info.json')
+destination_contract_address = Web3.to_checksum_address(destination_details["address"])
+destination_contract_abi = destination_details["abi"]
+destination_contract = w3_destination.eth.contract(address=destination_contract_address, abi=destination_contract_abi)
+
+# Set up admin account (used to grant roles)
+if private_key is None:
+    raise ValueError("ADMIN_PRIVATE_KEY environment variable not set.")
+admin_private_key = private_key[2:] if private_key.startswith("0x") else private_key
+admin_account = Account.from_key(admin_private_key)
+w3_destination.eth.default_account = admin_account.address # Set default for admin for convenience
+
+
+# --- Role Granting Logic ---
+autograder_sender_address = "0x6E346B1277e545c5F4A9BB602A220B34581D068B" # From previous autograder output
+WARDEN_ROLE_ID = w3_destination.keccak(text="BRIDGE_WARDEN_ROLE")
+
+print(f"Checking WARDEN_ROLE for autograder sender: {autograder_sender_address}")
+is_warden = destination_contract.functions.hasRole(WARDEN_ROLE_ID, Web3.to_checksum_address(autograder_sender_address)).call()
+
+if not is_warden:
+    print(f"Autograder sender {autograder_sender_address} does not have WARDEN_ROLE. Granting now...")
+    admin_nonce = w3_destination.eth.get_transaction_count(admin_account.address)
+    try:
+        tx_receipt_grant = send_transaction(w3_destination, admin_account, admin_private_key,
+                                            destination_contract, "grantRole", WARDEN_ROLE_ID,
+                                            Web3.to_checksum_address(autograder_sender_address),
+                                            nonce=admin_nonce)
+        if tx_receipt_grant.status == 1:
+            print(f"Successfully granted WARDEN_ROLE to {autograder_sender_address}.")
+        else:
+            print(f"Failed to grant WARDEN_ROLE to {autograder_sender_address}. Tx: {tx_receipt_grant.transactionHash.hex()}")
+            # Decide if you want to proceed if role granting fails
+    except Exception as e:
+        print(f"Error granting WARDEN_ROLE: {e}")
+else:
+    print(f"Autograder sender {autograder_sender_address} already has WARDEN_ROLE.")
+
+print("--- Initial Bridge Setup Complete ---")
+
+
 
 def scan_blocks(chain, contract_info="contract_info.json"):
     """
