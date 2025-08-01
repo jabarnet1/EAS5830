@@ -294,54 +294,83 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     # For a simple grader, continuing might be okay. In real life, handle carefully.
 
     elif chain == 'destination':
-        unwrap_events = contract.events.Unwrap.get_logs(
-            from_block=start_block,
-            to_block=latest_block
-        )
+        max_retries = 5
+        base_delay = 1  # seconds
 
-        if unwrap_events:  # Only fetch nonce if there are events to process
-            w3_source = connect_to('source')
-            if not w3_source.is_connected():
-                print("Failed to connect to source chain for withdrawing.")
-                return  # Exit or handle error
+        for attempt in range(max_retries):
+            try:
+                # Adjust block range here - e.g., scan 50 blocks at a time
+                current_start_block = start_block
+                current_end_block = min(latest_block, start_block + 49)  # Adjust 49 based on desired range size
 
-            source_details = get_contract_info('source', contract_info)
-            source_contract_address = Web3.to_checksum_address(source_details["address"])
-            source_contract_abi = source_details["abi"]
-            source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
+                unwrap_events = contract.events.Unwrap.get_logs(
+                    from_block=current_start_block,
+                    to_block=current_end_block
+                )
+                print(f"\nScanning {chain} chain from block {current_start_block} to {current_end_block}...")
+                last_scanned_block[chain] = current_end_block  # Update last scanned block after successful retrieval
 
-            warden_account = w3_source.eth.account.from_key(private_key)
-            w3_source.eth.default_account = warden_account.address
+                # Process events
+                if unwrap_events:  # Only fetch nonce if there are events to process
+                    w3_source = connect_to('source')
+                    if not w3_source.is_connected():
+                        print("Failed to connect to source chain for withdrawing.")
+                        return  # Exit or handle error
 
-            # --- START NONCE FIX ---
-            # Get the current nonce ONCE for this batch of transactions
-            current_nonce_source = w3_source.eth.get_transaction_count(warden_account.address)
-            # --- END NONCE FIX ---
+                    source_details = get_contract_info('source', contract_info)
+                    source_contract_address = Web3.to_checksum_address(source_details["address"])
+                    source_contract_abi = source_details["abi"]
+                    source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
 
-            # --- START NEW UNWRAP CALL ---
-            for event in unwrap_events:
-                event_args = event['args']
-                underlying_token = event_args['underlying_token']
-                wrapped_token = event_args['wrapped_token']
-                frm = event_args['frm']  # This is the _from parameter for the new unwrap
-                recipient = event_args['to']
-                amount = event_args['amount']
+                    warden_account = w3_source.eth.account.from_key(private_key)
+                    w3_source.eth.default_account = warden_account.address
 
-                print(f"Detected Unwrap event on Destination Chain:")
-                print(f"  Underlying Token: {underlying_token}")
-                print(f"  Wrapped Token: {wrapped_token}")
-                print(f"  From (Burner on Destination): {frm}")
-                print(f"  Recipient (Source Chain): {recipient}")
-                print(f"  Amount: {amount}")
+                    # --- START NONCE FIX ---
+                    # Get the current nonce ONCE for this batch of transactions
+                    current_nonce_source = w3_source.eth.get_transaction_count(warden_account.address)
+                    # --- END NONCE FIX ---
 
-                try:
-                    send_transaction(w3_source, warden_account, private_key,
-                                     source_contract, "withdraw", underlying_token, recipient, amount,
-                                     nonce=current_nonce_source)
-                    current_nonce_source += 1
-                except Exception as e:
-                    print(f"Error calling withdraw function on source chain: {e}")
-            # --- END NEW UNWRAP CALL ---
+                    # --- START NEW UNWRAP CALL ---
+                    for event in unwrap_events:
+                        event_args = event['args']
+                        underlying_token = event_args['underlying_token']
+                        wrapped_token = event_args['wrapped_token']
+                        frm = event_args['frm']  # This is the _from parameter for the new unwrap
+                        recipient = event_args['to']
+                        amount = event_args['amount']
+
+                        print(f"Detected Unwrap event on Destination Chain:")
+                        print(f"  Underlying Token: {underlying_token}")
+                        print(f"  Wrapped Token: {wrapped_token}")
+                        print(f"  From (Burner on Destination): {frm}")
+                        print(f"  Recipient (Source Chain): {recipient}")
+                        print(f"  Amount: {amount}")
+
+                        try:
+                            send_transaction(w3_source, warden_account, private_key,
+                                             source_contract, "withdraw", underlying_token, recipient, amount,
+                                             nonce=current_nonce_source)
+                            current_nonce_source += 1
+                        except Exception as e:
+                            print(f"Error calling withdraw function on source chain: {e}")
+                    # --- END NEW UNWRAP CALL ---
+
+                # Successfully retrieved logs, break retry loop
+                break
+
+            except Exception as e:
+                # Assuming the error message will be like {'code': -32005, 'message': 'limit exceeded'}
+                if isinstance(e.args[0], dict) and e.args[0].get('code') == -32005:
+                    delay = base_delay * (2 ** attempt)  # Exponential backoff
+                    print(
+                        f"RPC rate limit exceeded. Retrying in {delay} seconds (Attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(delay)
+                else:
+                    print(f"ERROR: running scan_blocks('{chain}'): {e}")
+                    break  # Break on other errors
+        else:
+            print(f"ERROR: Failed to scan blocks on {chain} after {max_retries} retries due to RPC limit.")
+
 
 
 def register_and_create_tokens(warden_private_key, contract_info="contract_info.json"):
