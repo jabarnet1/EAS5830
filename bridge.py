@@ -231,10 +231,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 print(f"  Recipient (Destination): {recipient}")
                 print(f"  Amount: {amount}")
 
-                # --- START NEW LOGIC: Check if wrapped token exists, create if not ---
-                # Check if a wrapped token exists for this underlying token on the destination chain
-                # Need to use the `wrapped_tokens` mapping public getter from Destination.sol
-                # Ensure ZERO_ADDRESS is defined somewhere (e.g., ZERO_ADDRESS = '0x0000000000000000000000000000000000000000')
                 try:
                     # Call the public getter for the wrapped_tokens mapping
                     # The `token` variable here refers to the `_underlying_token` from the Deposit event
@@ -244,10 +240,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     if wrapped_token_address == ZERO_ADDRESS:  # Assuming ZERO_ADDRESS is defined as '0x0...'
                         print(
                             f"DEBUG: Wrapped token not found for underlying token {token}. Attempting to create new wrapped token...")
-                        # You'll need name and symbol for the BridgeToken constructor.
-                        # For the autograder, using a generic name/symbol might be sufficient,
-                        # or you might need to extract them from the underlying token contract
-                        # if the autograder expects specific ones (less likely for this step).
+
                         wrapped_token_name = f"Wrapped {token[:6]}..."  # Placeholder, adjust as needed
                         wrapped_token_symbol = f"W{token[:4]}"  # Placeholder, adjust as needed
 
@@ -260,9 +253,7 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                         if tx_receipt_create.status == 1:
                             print(
                                 f"DEBUG: Successfully created wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
-                            # After creation, you might want to re-fetch the wrapped_token_address
-                            # to ensure the mapping is updated, although the next `scan_blocks` might handle this implicitly
-                            # For safety, you could re-call the getter here if needed for subsequent logic in this loop
+
                             wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
                             print(f"DEBUG: Re-fetched wrapped token address after creation: {wrapped_token_address}")
                         else:
@@ -276,12 +267,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     # Handle the error appropriately, perhaps log it and continue
                     continue  # Skip this deposit and try the next one
 
-                # --- END NEW LOGIC ---
-
-                # Proceed with calling wrap, now that we know (or have created) the wrapped token mapping
-                # The 'token' variable here is the _underlying_token from the Deposit event.
-                # Your Destination contract's 'wrap' function likely expects this same underlying token address
-                # to then find its corresponding wrapped token via the mapping.
                 try:
                     print(f"Calling wrap with arguments: token={token}, recipient={recipient}, amount={amount}")
                     send_transaction(w3_destination, warden_account, private_key,
@@ -290,8 +275,6 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     current_nonce_destination += 1
                 except Exception as e:
                     print(f"Error calling wrap function on destination chain: {e}")
-                    # Decide if you want to continue processing other events or stop
-                    # For a simple grader, continuing might be okay. In real life, handle carefully.
 
     elif chain == 'destination':
         max_retries = 5
@@ -411,8 +394,6 @@ def register_and_create_tokens(warden_private_key, contract_info="contract_info.
             token_address_str = row[1]  # Gets the token address string
             token_address = Web3.to_checksum_address(token_address_str)
 
-            # You might need to infer or provide names/symbols.
-            # For assignment, a simple naming might suffice.
             wrapped_token_name = f"Wrapped ERC20 {token_address_str[:6]}..."
             wrapped_token_symbol = f"WERC{token_address_str[2:6].upper()}"
 
