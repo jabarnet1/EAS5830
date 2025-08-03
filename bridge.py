@@ -240,9 +240,9 @@ def scan_blocks(chain, contract_info="contract_info.json"): # Your original sign
     # --- Process Deposit events on Source chain ---
     if chain == 'source': # Only process source if 'chain' argument is 'source'
         print(f"Scanning source chain from block {start_block_source} to {latest_block_source} (last 5 blocks)...")
-        deposit_filter = source_contract.events.Deposit.createFilter(
-            fromBlock=start_block_source,
-            toBlock=latest_block_source,
+        deposit_filter = source_contract.events.Deposit.create_filter(
+            from_block=start_block_source,
+            to_block=latest_block_source,
             address=source_contract_address
         )
         deposit_events = deposit_filter.get_all_entries() # Use get_all_entries for fixed range
@@ -261,9 +261,9 @@ def scan_blocks(chain, contract_info="contract_info.json"): # Your original sign
     # --- Process Unwrap events on Destination chain ---
     elif chain == 'destination': # Only process destination if 'chain' argument is 'destination'
         print(f"Scanning destination chain from block {start_block_destination} to {latest_block_destination} (last 5 blocks)...")
-        unwrap_filter = destination_contract.events.Unwrap.createFilter(
-            fromBlock=start_block_destination,
-            toBlock=latest_block_destination,
+        unwrap_filter = destination_contract.events.Unwrap.create_filter(
+            from_block=start_block_destination,
+            to_block=latest_block_destination,
             address=destination_contract_address
         )
         unwrap_events = unwrap_filter.get_all_entries() # Use get_all_entries for fixed range
