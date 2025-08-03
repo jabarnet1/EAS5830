@@ -199,8 +199,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
         #)
 
         deposit_filter = contract.events.Deposit.create_filter(
-            fromBlock=start_block,
-            toBlock=latest_block  # Or use 'latest' if you want it to automatically track up to the current block
+            from_block=start_block,
+            to_block=latest_block  # Or use 'latest' if you want it to automatically track up to the current block
         )
 
         if deposit_filter:
@@ -298,8 +298,8 @@ def scan_blocks(chain, contract_info="contract_info.json"):
 
                 # Create the filter for Unwrap events
                 unwrap_filter = contract.events.Unwrap.create_filter(
-                    fromBlock=current_start_block,
-                    toBlock=current_end_block
+                    from_block=current_start_block,
+                    to_block=current_end_block
                 )
 
                 #unwrap_events = contract.events.Unwrap.get_logs(
