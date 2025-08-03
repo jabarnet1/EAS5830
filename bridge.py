@@ -428,7 +428,7 @@ def register_and_create_tokens(warden_private_key, contract_info="contract_info.
         for row in reader:
             if not row:
                 continue
-            token_address_str = row[1]  # Assuming CSV is 'chain,address' format, so address is row[1]
+            token_address_str = row[1]
             token_address = Web3.to_checksum_address(token_address_str)
 
             print(f"\nProcessing token: {token_address_str}")
@@ -436,33 +436,40 @@ def register_and_create_tokens(warden_private_key, contract_info="contract_info.
             # --- Register Token on Source Chain (Avalanche) ---
             print(f"  --> Registering on Source chain for token {token_address_str}...")
             try:
-                # Source.sol has registerToken(address _token)
                 send_transaction(w3_source, warden_account_source, warden_private_key,
                                  source_contract, "registerToken", token_address, nonce=current_nonce_source)
                 current_nonce_source += 1
             except Exception as e:
-                print(f"    Error registering token {token_address_str} on Source: {e}")
-                continue
+                # Check if the specific revert message is present
+                if "Token Registered" in str(e):
+                    print(
+                        f"    Token {token_address_str} is already registered on Source. Proceeding to Destination setup.")
+                else:
+                    print(
+                        f"    Critical error registering token {token_address_str} on Source: {e}. Skipping Destination setup.")
+                    continue  # Only skip Destination setup if it's a critical error
+                # If 'Token Registered', no continue here, allow processing for Destination chain to proceed.
 
             # --- Create Wrapped Token on Destination Chain (BNB) ---
             print(f"  --> Creating wrapped token on Destination chain for underlying token {token_address_str}...")
             try:
-                # Destination.sol has createToken(address _underlying_token, string memory name, string memory symbol)
-                # You need to provide 'name' and 'symbol' for the new wrapped token
-                wrapped_token_name = f"Wrapped ERC20 {token_address_str[:6]}"  # Shorter for display, remove "..."
+                wrapped_token_name = f"Wrapped ERC20 {token_address_str[:6]}"
                 wrapped_token_symbol = f"WERC{token_address_str[2:6].upper()}"
 
                 send_transaction(w3_destination, warden_account_destination, warden_private_key,
-                                 destination_contract, "createToken",  # <-- Use 'createToken' here
+                                 destination_contract, "createToken",
                                  token_address, wrapped_token_name, wrapped_token_symbol,
-                                 # <-- Pass the correct arguments
                                  nonce=current_nonce_destination)
                 current_nonce_destination += 1
             except Exception as e:
                 print(f"    Error creating wrapped token for {token_address_str} on Destination: {e}")
-                continue
+                # You might add a specific check here for "Wrapped token already exists"
+                # and print a message similar to the Source chain if it's already done.
+                continue  # Continue to next token if Destination setup fails
 
         print("\n--- Token registration and creation process complete. ---")
+
+
 # ... (main_loop and if __name__ == "__main__": block) ...
 
 if __name__ == "__main__":
@@ -471,4 +478,4 @@ if __name__ == "__main__":
         exit()
 
     # Call the registration function before starting the main listener loop
-    register_and_create_tokens(private_key)
+    #register_and_create_tokens(private_key)
