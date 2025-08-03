@@ -412,6 +412,10 @@ def register_and_create_tokens(warden_private_key, contract_info="contract_info.
     warden_account_source = w3_source.eth.account.from_key(warden_private_key)
     warden_account_destination = w3_destination.eth.account.from_key(warden_private_key)
 
+    # Initialize nonces for both accounts outside the loop
+    current_nonce_source = w3_source.eth.get_transaction_count(warden_account_source.address)
+    current_nonce_destination = w3_destination.eth.get_transaction_count(warden_account_destination.address)
+
     # Assumes your erc20s.csv has a header row and token addresses in the first column
     with open('erc20s.csv', 'r') as csvfile:
         reader = csv.reader(csvfile)
@@ -435,6 +439,7 @@ def register_and_create_tokens(warden_private_key, contract_info="contract_info.
                 nonce_source = w3_source.eth.get_transaction_count(warden_account_source.address)
                 send_transaction(w3_source, warden_account_source, warden_private_key,
                                  source_contract, "registerToken", token_address, nonce=nonce_source)
+                current_nonce_source += 1  # This line is correct for managing nonce
             except Exception as e:
                 print(f"Error registering token {token_address_str} on Source: {e}")
 
