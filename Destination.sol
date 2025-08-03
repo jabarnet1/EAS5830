@@ -66,8 +66,8 @@ contract Destination is AccessControl {
 	}
 
     function unwrap(address _wrapped_token, address _recipient, uint256 _amount)
-    //public onlyRole(WARDEN_ROLE) {
-    public {
+    public onlyRole(WARDEN_ROLE) {
+    //public {
     require(_wrapped_token != address(0), "Invalid wrapped token address");
     require(_recipient != address(0), "Invalid recipient address");
     require(_amount > 0, "Amount must be greater than zero");
@@ -77,8 +77,8 @@ contract Destination is AccessControl {
 
     // The Destination contract burns its own tokens, it is the MINTER_ROLE for the BridgeToken
     // Since it's burning from itself, you can use _burn or the public burn function inherited from ERC20Burnable.
-    BridgeToken(_wrapped_token).burn(_amount); // Use the burn function that burns from msg.sender (which is address(this) for this call)
-    //BridgeToken(_wrapped_token).burnFrom(address(this), _amount);
+    //BridgeToken(_wrapped_token).burn(_amount); // Use the burn function that burns from msg.sender (which is address(this) for this call)
+    BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
     emit Unwrap(underlyingTokenAddress, _wrapped_token, msg.sender, _recipient, _amount);
     }

@@ -421,38 +421,48 @@ def register_and_create_tokens(warden_private_key, contract_info="contract_info.
         reader = csv.reader(csvfile)
         next(reader)  # Skip header row
 
-        for row in reader:
-            if not row:  # Skip empty rows if any
-                continue
-            chain_name = row[0]  # Gets 'avax' or 'bsc'
-            token_address_str = row[1]  # Gets the token address string
-            token_address = Web3.to_checksum_address(token_address_str)
+        # Initialize nonces for both accounts outside the loop
+        current_nonce_source = w3_source.eth.get_transaction_count(warden_account_source.address)
+        current_nonce_destination = w3_destination.eth.get_transaction_count(warden_account_destination.address)
 
-            wrapped_token_name = f"Wrapped ERC20 {token_address_str[:6]}..."
-            wrapped_token_symbol = f"WERC{token_address_str[2:6].upper()}"
+        for row in reader:
+            if not row:
+                continue
+            token_address_str = row[1]  # Assuming CSV is 'chain,address' format, so address is row[1]
+            token_address = Web3.to_checksum_address(token_address_str)
 
             print(f"\nProcessing token: {token_address_str}")
 
-            # Call registerToken on Source
+            # --- Register Token on Source Chain (Avalanche) ---
+            print(f"  --> Registering on Source chain for token {token_address_str}...")
             try:
-                # Ensure the nonce is correctly managed for sequential transactions
-                nonce_source = w3_source.eth.get_transaction_count(warden_account_source.address)
+                # Source.sol has registerToken(address _token)
                 send_transaction(w3_source, warden_account_source, warden_private_key,
-                                 source_contract, "registerToken", token_address, nonce=nonce_source)
-                current_nonce_source += 1  # This line is correct for managing nonce
+                                 source_contract, "registerToken", token_address, nonce=current_nonce_source)
+                current_nonce_source += 1
             except Exception as e:
-                print(f"Error registering token {token_address_str} on Source: {e}")
+                print(f"    Error registering token {token_address_str} on Source: {e}")
+                continue
 
-            # Call createToken on Destination
+            # --- Create Wrapped Token on Destination Chain (BNB) ---
+            print(f"  --> Creating wrapped token on Destination chain for underlying token {token_address_str}...")
             try:
-                nonce_destination = w3_destination.eth.get_transaction_count(warden_account_destination.address)
+                # Destination.sol has createToken(address _underlying_token, string memory name, string memory symbol)
+                # You need to provide 'name' and 'symbol' for the new wrapped token
+                wrapped_token_name = f"Wrapped ERC20 {token_address_str[:6]}"  # Shorter for display, remove "..."
+                wrapped_token_symbol = f"WERC{token_address_str[2:6].upper()}"
+
                 send_transaction(w3_destination, warden_account_destination, warden_private_key,
-                                 destination_contract, "createToken", token_address, wrapped_token_name,
-                                 wrapped_token_symbol, nonce=nonce_destination)
+                                 destination_contract, "createToken",  # <-- Use 'createToken' here
+                                 token_address, wrapped_token_name, wrapped_token_symbol,
+                                 # <-- Pass the correct arguments
+                                 nonce=current_nonce_destination)
+                current_nonce_destination += 1
             except Exception as e:
-                print(f"Error creating wrapped token for {token_address_str} on Destination: {e}")
+                print(f"    Error creating wrapped token for {token_address_str} on Destination: {e}")
+                continue
 
-
+        print("\n--- Token registration and creation process complete. ---")
 # ... (main_loop and if __name__ == "__main__": block) ...
 
 if __name__ == "__main__":
@@ -461,4 +471,4 @@ if __name__ == "__main__":
         exit()
 
     # Call the registration function before starting the main listener loop
-    #register_and_create_tokens(private_key)
+    register_and_create_tokens(private_key)

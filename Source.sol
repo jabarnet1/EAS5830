@@ -56,8 +56,6 @@ contract Source is AccessControl {
         tokens.push(_token);
         emit Registration(_token);
 	}
-
-
 }
 
 
