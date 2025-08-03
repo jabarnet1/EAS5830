@@ -185,96 +185,106 @@ def scan_blocks(chain, contract_info="contract_info.json"):
     else:
         start_block = last_scanned_block[chain] + 1
 
+
     if start_block > latest_block:
         print(f"No new blocks to scan on {chain}.")
         return
-
     print(f"\nScanning {chain} chain from block {start_block} to {latest_block}...")
     last_scanned_block[chain] = latest_block
 
     if chain == 'source':
-        deposit_events = contract.events.Deposit.get_logs(
-            from_block=start_block,
-            to_block=latest_block
+        #deposit_events = contract.events.Deposit.get_logs(
+        #    from_block=start_block,
+        #    to_block=latest_block
+        #)
+
+        deposit_filter = contract.events.Deposit.create_filter(
+            fromBlock=start_block,
+            toBlock=latest_block  # Or use 'latest' if you want it to automatically track up to the current block
         )
 
-        if deposit_events:  # Only fetch nonce if there are events to process
-            w3_destination = connect_to('destination')
-            if not w3_destination.is_connected():
-                print("Failed to connect to destination chain for wrapping.")
-                return  # Exit or handle error
+        if deposit_filter:
+            print(f"Created filter for Deposit events on source chain from block {start_block} to {latest_block}.")
+            deposit_events = deposit_filter.get_all_entries()
+            # You can also use get_new_entries() to get only newly emitted events since the last call to this function
 
-            destination_details = get_contract_info('destination', contract_info)
-            destination_contract_address = Web3.to_checksum_address(destination_details["address"])
-            destination_contract_abi = destination_details["abi"]
-            destination_contract = w3_destination.eth.contract(address=destination_contract_address,
-                                                               abi=destination_contract_abi)
+            if deposit_events:  # Only fetch nonce if there are events to process
+                w3_destination = connect_to('destination')
+                if not w3_destination.is_connected():
+                    print("Failed to connect to destination chain for wrapping.")
+                    return  # Exit or handle error
 
-            warden_account = w3_destination.eth.account.from_key(private_key)
-            w3_destination.eth.default_account = warden_account.address
+                destination_details = get_contract_info('destination', contract_info)
+                destination_contract_address = Web3.to_checksum_address(destination_details["address"])
+                destination_contract_abi = destination_details["abi"]
+                destination_contract = w3_destination.eth.contract(address=destination_contract_address,
+                                                                   abi=destination_contract_abi)
 
-            # --- START NONCE FIX ---
-            # Get the current nonce ONCE for this batch of transactions
-            current_nonce_destination = w3_destination.eth.get_transaction_count(warden_account.address)
-            # --- END NONCE FIX ---
+                warden_account = w3_destination.eth.account.from_key(private_key)
+                w3_destination.eth.default_account = warden_account.address
 
-            for event in deposit_events:
-                print(f"Raw Deposit event: {event}")
-                event_args = event['args']
-                token = event_args['token']
-                recipient = event_args['recipient']
-                amount = event_args['amount']
-                print(f"Extracted amount from Deposit event: {amount}")
+                # --- START NONCE FIX ---
+                # Get the current nonce ONCE for this batch of transactions
+                current_nonce_destination = w3_destination.eth.get_transaction_count(warden_account.address)
+                # --- END NONCE FIX ---
 
-                print(f"Detected Deposit event on Source Chain:")
-                print(f"  Token: {token}")
-                print(f"  Recipient (Destination): {recipient}")
-                print(f"  Amount: {amount}")
+                for event in deposit_events:
+                    print(f"Raw Deposit event: {event}")
+                    event_args = event['args']
+                    token = event_args['token']
+                    recipient = event_args['recipient']
+                    amount = event_args['amount']
+                    print(f"Extracted amount from Deposit event: {amount}")
 
-                try:
-                    # Call the public getter for the wrapped_tokens mapping
-                    # The `token` variable here refers to the `_underlying_token` from the Deposit event
-                    wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
-                    print(f"DEBUG: Checked wrapped_tokens mapping for {token}, found: {wrapped_token_address}")
+                    print(f"Detected Deposit event on Source Chain:")
+                    print(f"  Token: {token}")
+                    print(f"  Recipient (Destination): {recipient}")
+                    print(f"  Amount: {amount}")
 
-                    if wrapped_token_address == ZERO_ADDRESS:  # Assuming ZERO_ADDRESS is defined as '0x0...'
-                        print(
-                            f"DEBUG: Wrapped token not found for underlying token {token}. Attempting to create new wrapped token...")
+                    try:
+                        # Call the public getter for the wrapped_tokens mapping
+                        # The `token` variable here refers to the `_underlying_token` from the Deposit event
+                        wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
+                        print(f"DEBUG: Checked wrapped_tokens mapping for {token}, found: {wrapped_token_address}")
 
-                        wrapped_token_name = f"Wrapped {token[:6]}..."  # Placeholder, adjust as needed
-                        wrapped_token_symbol = f"W{token[:4]}"  # Placeholder, adjust as needed
-
-                        tx_receipt_create = send_transaction(w3_destination, warden_account, private_key,
-                                                             destination_contract, "createToken", token,
-                                                             wrapped_token_name, wrapped_token_symbol,
-                                                             nonce=current_nonce_destination)
-                        current_nonce_destination += 1  # Increment nonce for the createToken transaction
-
-                        if tx_receipt_create.status == 1:
+                        if wrapped_token_address == ZERO_ADDRESS:  # Assuming ZERO_ADDRESS is defined as '0x0...'
                             print(
-                                f"DEBUG: Successfully created wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
+                                f"DEBUG: Wrapped token not found for underlying token {token}. Attempting to create new wrapped token...")
 
-                            wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
-                            print(f"DEBUG: Re-fetched wrapped token address after creation: {wrapped_token_address}")
-                        else:
-                            print(
-                                f"ERROR: Failed to create wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
-                            # Decide if you want to continue processing other events or stop
-                            continue  # Skip this deposit and try the next one if token creation failed
+                            wrapped_token_name = f"Wrapped {token[:6]}..."  # Placeholder, adjust as needed
+                            wrapped_token_symbol = f"W{token[:4]}"  # Placeholder, adjust as needed
 
-                except Exception as e:
-                    print(f"ERROR: Exception during wrapped token check/creation for {token}: {e}")
-                    # Handle the error appropriately, perhaps log it and continue
-                    continue  # Skip this deposit and try the next one
+                            tx_receipt_create = send_transaction(w3_destination, warden_account, private_key,
+                                                                 destination_contract, "createToken", token,
+                                                                 wrapped_token_name, wrapped_token_symbol,
+                                                                 nonce=current_nonce_destination)
+                            current_nonce_destination += 1  # Increment nonce for the createToken transaction
 
-                try:
-                    print(f"Calling wrap with arguments: token={token}, recipient={recipient}, amount={amount}")
-                    send_transaction(w3_destination, warden_account, private_key,
-                                     destination_contract, "wrap", token, recipient, amount,
-                                     nonce=current_nonce_destination)
-                    current_nonce_destination += 1
-                except Exception as e:
-                    print(f"Error calling wrap function on destination chain: {e}")
+                            if tx_receipt_create.status == 1:
+                                print(
+                                    f"DEBUG: Successfully created wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
+
+                                wrapped_token_address = destination_contract.functions.wrapped_tokens(token).call()
+                                print(f"DEBUG: Re-fetched wrapped token address after creation: {wrapped_token_address}")
+                            else:
+                                print(
+                                    f"ERROR: Failed to create wrapped token for {token} (Tx Hash: {tx_receipt_create.transactionHash.hex()})")
+                                # Decide if you want to continue processing other events or stop
+                                continue  # Skip this deposit and try the next one if token creation failed
+
+                    except Exception as e:
+                        print(f"ERROR: Exception during wrapped token check/creation for {token}: {e}")
+                        # Handle the error appropriately, perhaps log it and continue
+                        continue  # Skip this deposit and try the next one
+
+                    try:
+                        print(f"Calling wrap with arguments: token={token}, recipient={recipient}, amount={amount}")
+                        send_transaction(w3_destination, warden_account, private_key,
+                                         destination_contract, "wrap", token, recipient, amount,
+                                         nonce=current_nonce_destination)
+                        current_nonce_destination += 1
+                    except Exception as e:
+                        print(f"Error calling wrap function on destination chain: {e}")
 
     elif chain == 'destination':
         max_retries = 5
@@ -286,57 +296,24 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                 current_start_block = start_block
                 current_end_block = min(latest_block, start_block + 49)  # Adjust 49 based on desired range size
 
-                unwrap_events = contract.events.Unwrap.get_logs(
-                    from_block=current_start_block,
-                    to_block=current_end_block
+                # Create the filter for Unwrap events
+                unwrap_filter = contract.events.Unwrap.create_filter(
+                    fromBlock=current_start_block,
+                    toBlock=current_end_block
                 )
+
+                #unwrap_events = contract.events.Unwrap.get_logs(
+                #    from_block=current_start_block,
+                #    to_block=current_end_block
+                #)
                 print(f"\nScanning {chain} chain from block {current_start_block} to {current_end_block}...")
                 last_scanned_block[chain] = current_end_block  # Update last scanned block after successful retrieval
 
-                # Process events
-                if unwrap_events:  # Only fetch nonce if there are events to process
-                    w3_source = connect_to('source')
-                    if not w3_source.is_connected():
-                        print("Failed to connect to source chain for withdrawing.")
-                        return  # Exit or handle error
+                # Get all matching entries from the filter
+                unwrap_events = unwrap_filter.get_all_entries()
 
-                    source_details = get_contract_info('source', contract_info)
-                    source_contract_address = Web3.to_checksum_address(source_details["address"])
-                    source_contract_abi = source_details["abi"]
-                    source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
-
-                    warden_account = w3_source.eth.account.from_key(private_key)
-                    w3_source.eth.default_account = warden_account.address
-
-                    # --- START NONCE FIX ---
-                    # Get the current nonce ONCE for this batch of transactions
-                    current_nonce_source = w3_source.eth.get_transaction_count(warden_account.address)
-                    # --- END NONCE FIX ---
-
-                    # --- START NEW UNWRAP CALL ---
-                    for event in unwrap_events:
-                        event_args = event['args']
-                        underlying_token = event_args['underlying_token']
-                        wrapped_token = event_args['wrapped_token']
-                        frm = event_args['frm']  # This is the _from parameter for the new unwrap
-                        recipient = event_args['to']
-                        amount = event_args['amount']
-
-                        print(f"Detected Unwrap event on Destination Chain:")
-                        print(f"  Underlying Token: {underlying_token}")
-                        print(f"  Wrapped Token: {wrapped_token}")
-                        print(f"  From (Burner on Destination): {frm}")
-                        print(f"  Recipient (Source Chain): {recipient}")
-                        print(f"  Amount: {amount}")
-
-                        try:
-                            send_transaction(w3_source, warden_account, private_key,
-                                             source_contract, "withdraw", underlying_token, recipient, amount,
-                                             nonce=current_nonce_source)
-                            current_nonce_source += 1
-                        except Exception as e:
-                            print(f"Error calling withdraw function on source chain: {e}")
-                    # --- END NEW UNWRAP CALL ---
+                print(f"\nScanning {chain} chain from block {current_start_block} to {current_end_block}...")
+                last_scanned_block[chain] = current_end_block  # Update last scanned block after successful retrieval
 
                 # Successfully retrieved logs, break retry loop
                 break
@@ -350,9 +327,62 @@ def scan_blocks(chain, contract_info="contract_info.json"):
                     time.sleep(delay)
                 else:
                     print(f"ERROR: running scan_blocks('{chain}'): {e}")
-                    break  # Break on other errors
+                    break  # Break on other
+
         else:
             print(f"ERROR: Failed to scan blocks on {chain} after {max_retries} retries due to RPC limit.")
+            return  # Exit if retries fail
+
+        # Process events
+        if unwrap_events:  # Only fetch nonce if there are events to process
+            w3_source = connect_to('source')
+            if not w3_source.is_connected():
+                print("Failed to connect to source chain for withdrawing.")
+                return  # Exit or handle error
+
+            source_details = get_contract_info('source', contract_info)
+            source_contract_address = Web3.to_checksum_address(source_details["address"])
+            source_contract_abi = source_details["abi"]
+            source_contract = w3_source.eth.contract(address=source_contract_address, abi=source_contract_abi)
+
+            warden_account = w3_source.eth.account.from_key(private_key)
+            w3_source.eth.default_account = warden_account.address
+
+            # --- START NONCE FIX ---
+            # Get the current nonce ONCE for this batch of transactions
+            current_nonce_source = w3_source.eth.get_transaction_count(warden_account.address)
+            # --- END NONCE FIX ---
+
+            # --- START NEW UNWRAP CALL ---
+            for event in unwrap_events:
+                event_args = event['args']
+                underlying_token = event_args['underlying_token']
+                wrapped_token = event_args['wrapped_token']
+                frm = event_args['frm']  # This is the _from parameter for the new unwrap
+                recipient = event_args['to']
+                amount = event_args['amount']
+
+                print(f"Detected Unwrap event on Destination Chain:")
+                print(f"  Underlying Token: {underlying_token}")
+                print(f"  Wrapped Token: {wrapped_token}")
+                print(f"  From (Burner on Destination): {frm}")
+                print(f"  Recipient (Source Chain): {recipient}")
+                print(f"  Amount: {amount}")
+
+                try:
+                    send_transaction(w3_source, warden_account, private_key,
+                                     source_contract, "withdraw", underlying_token, recipient, amount,
+                                     nonce=current_nonce_source)
+                    current_nonce_source += 1
+                except Exception as e:
+                    print(f"Error calling withdraw function on source chain: {e}")
+            # --- END NEW UNWRAP CALL ---
+
+                # Successfully retrieved logs, break retry loop
+                break
+
+            else:
+                print(f"ERROR: Failed to scan blocks on {chain} after {max_retries} retries due to RPC limit.")
 
 
 
