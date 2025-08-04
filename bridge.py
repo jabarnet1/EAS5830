@@ -227,11 +227,13 @@ def scan_blocks(chain, contract_info="contract_info.json"): # Your original sign
 
     # Determine blocks to scan based on the SPECIFICATION
     # "Scan the last 5 blocks of the source and destination chains"
+    SCAN_WINDOW_SIZE = 20
+
     latest_block_source = w3_source.eth.block_number
-    start_block_source = max(0, latest_block_source - 5)
+    start_block_source = max(0, latest_block_source - SCAN_WINDOW_SIZE)
 
     latest_block_destination = w3_destination.eth.block_number
-    start_block_destination = max(0, latest_block_destination - 5)
+    start_block_destination = max(0, latest_block_destination - SCAN_WINDOW_SIZE)
 
     # Initialize nonces for this run
     current_nonce_source_run = w3_source.eth.get_transaction_count(warden_account_source.address)
