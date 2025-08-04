@@ -190,7 +190,7 @@ def handle_unwrap_event(event, w3_source, source_contract, warden_account_source
         tx_hash_withdraw = send_transaction(w3_source, warden_account_source, private_key,
                                             source_contract, "withdraw", _underlying_token, _recipient, _amount,
                                             nonce=current_nonce_source)
-        print(f"  Withdraw transaction Hash (Source Chain): {tx_hash_withdraw.hex()}")  # Print the hash
+        print(f"  Withdraw transaction Hash (Source Chain): {tx_hash_withdraw.transactionHash.hex()}")  # Print the hash
         print("  Successfully called withdraw() on Source contract.")
         return True, current_nonce_source + 1
     except Exception as e:
